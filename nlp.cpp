@@ -33,6 +33,10 @@ Y υ [upsilon] 宇普西龙
 */
 #include <cmath>
 #include <vector>
+#include <cstdio>
+#include <string>
+#include <sstream>
+#include <iostream>
 
 #include <Array.h>
 #include <Matrix.h>
@@ -122,6 +126,9 @@ Array<T> SigmoidActivator<T>::back(Array<T> array){
 //基本单元抽象
 template <class T>
 class BaseUnit{
+    protected: 
+        //层属性
+        std::string property;
     public:
         BaseUnit(){};
         virtual ~BaseUnit(){};
@@ -168,7 +175,8 @@ NolinearUnit<T,m,n>::NolinearUnit(ActiveFun<T> *fun):InputSize(n),
                                                     Out(1,n,0),
                                                     δ(1,n,0),
                                                     InputValue(m,1,0),
-                                                    Active(fun)
+                                                    Active(fun),
+                                                    BaseUnit<T>::property("NolinearUnit")
 {
     //初始化单元权重和状态
     Paraminith(weight);
@@ -204,34 +212,46 @@ Array<T> NolinearUnit<T,m,n>::UnitBack(Array<T> Nextδ,Array<T> NextWeight)
 //Fully Connected Layer
 class FCLNet{
     private:
-        //所有层之间，
-        vector<BaseUnit<double>*> layerVector;
-
+        //vector存储所有层
+        std::vector<BaseUnit<double>*> layerVector;
     public:
         FCLNet();
         ~FCLNet();
-        
+        //增加层 
+        bool Addlayer(BaseUnit<double>* newLayer,int Index);
         //前向传播
-        run
+        run();
         //反向传播
-        train
+        train();
 };
 //全连接网络生成
 FCLNet::FCLNet():layerVector()
 {
 }
-//添加序号以及隐藏节点个数
-bool FCLNet::Addlayer(int num,int Index)
+//添加一个层
+bool FCLNet::Addlayer(BaseUnit<double>* newLayer,int Index)
 {
-    iterator it=layerVector.head();
-    for(it=layerVector.head();it!=layerVector.end();it++)
+    if(NULL == newLayer)
     {
-        if(it == Index)
+        printf("Add layer is empty!\n");
+    }
+
+    if(true == layerVector.empty())
+    {
+        layerVector.push_back(newLayer);
+    }
+    
+    std::vector<BaseUnit<double>*>::iterator it=layerVector.begin();
+    for(int i=0;it!=layerVector.end();it++,i++)
+    {
+        if(i == Index)
         {
             break;
         }
     }
-       layerHead = new NolinearUnit<double,1>[10];
+
+    layerVector.insert(it,newLayer);
+    return true;
 }
 //输入数据，做全连接层计算
 bool run()
