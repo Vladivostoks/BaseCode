@@ -38,10 +38,22 @@ Y υ [upsilon] 宇普西龙
 #include <sstream>
 #include <iostream>
 
-#include <Array.h>
-#include <Matrix.h>
+#include "Array.h"
+#include "Matrix.h"
+#include "sysTool.h"
 
-//激活函数抽象
+static Time DBGTime;
+#define LOG_ERR(x) std::cout<<"["<<DBGTime.GetSTime()<<"][ERROR]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
+#define LOG_WARN(x) std::cout<<"["<<DBGTime.GetSTime()<<"][WARN]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
+#define LOG_INFO(x) std::cout<<"["<<DBGTime.GetSTime()<<"][INFO]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
+
+/*********************************配置选项**********************************/
+//学习率
+#define η   0.1
+
+
+/*********************************激活函数**********************************/
+//激活函数和损失函数抽象
 template<class T>
 class ActiveFun{
         ActiveFun(){};
@@ -119,10 +131,21 @@ Array<T> SigmoidActivator<T>::back(Array<T> array){
     return front(array)*(1-front(array));
 }
 
+/*********************************损失函数**********************************/
+/*平方差函数*/
+template<class T>
+class squareLoss:ActiveFun<T>{
+        squareLoss(){};
+        ~squareLoss(){};
+        //前向运算
+        T front(T value); 
+        Array<T> front(Array<T> array);
+        //反向传播
+        T back(T value);
+        Array<T> back(Array<T> array);
+};
 
-//学习率
-#define η   0.1
-
+/*********************************基本单元**********************************/
 //基本单元抽象
 template <class T>
 class BaseUnit{
@@ -133,6 +156,9 @@ class BaseUnit{
         BaseUnit(){};
         virtual ~BaseUnit(){};
         //方法
+        virtual unsigned int GOutSize()=0;
+        virtual Array<T> getw()=0;
+        virtual Array<T> getδ()=0;
         virtual Array<T> UnitFront(Array<T> input)=0;
         virtual Array<T> UnitBack(Array<T> Nextδ,Array<T> NextWeight)=0;
 };
@@ -145,6 +171,8 @@ class NolinearUnit:public BaseUnit<T>{
     private:
         //单元输入个数，对应权重数
         const int InputSize;
+        //单元输出个数
+        const int OutputSize;
         //单元权重,m*n矩阵,代表n个单元,每个对m个输入的权值
         Array<T>  weight;
         //单元偏置,1*n矩阵，表示n个单元
@@ -164,12 +192,16 @@ class NolinearUnit:public BaseUnit<T>{
         ~NolinearUnit();
 
         //单元流程
+        unsigned int GOutSize(){return OutputSize;};
+        Array<T> getw(){return weight;};
+        Array<T> getδ(){return δ;};
         Array<T> UnitFront(Array<T> input);
         Array<T> UnitBack(Array<T> Nextδ,Array<T> NextWeight);
 };
 
 template <class T,int m,int n>
-NolinearUnit<T,m,n>::NolinearUnit(ActiveFun<T> *fun):InputSize(n),
+NolinearUnit<T,m,n>::NolinearUnit(ActiveFun<T> *fun):InputSize(m),
+                                                    OutputSize(n),
                                                     weight(m,n,0),
                                                     bias(1,n,0),
                                                     Out(1,n,0),
@@ -206,6 +238,8 @@ Array<T> NolinearUnit<T,m,n>::UnitBack(Array<T> Nextδ,Array<T> NextWeight)
     δ = Active->back(Out)*Matrix.dot(NextWeight,Nextδ.T()).T();
     //step 2:更新权重矩阵 m*1 dot 1*n 为梯度
     weight = weight-η*InputValue*δ;
+    //step 3:更新偏置矩阵 
+    bias = bias - η*δ;
     //返回本节点误差项
     return this->δ;
 }
@@ -214,51 +248,92 @@ class FCLNet{
     private:
         //vector存储所有层
         std::vector<BaseUnit<double>*> layerVector;
+        //损失函数
+        Fuction lossfun;
     public:
         FCLNet();
         ~FCLNet();
         //增加层 
-        bool Addlayer(BaseUnit<double>* newLayer,int Index);
+        bool Addlayer(BaseUnit<double>* newLayer,int Index=0);
         //前向传播
-        run();
-        //反向传播
-        train();
+        Array<double> run(Array<double>& indata);
+        //反向传播,模版成员函数
+        template <class M>
+        M train(Array<double>& X,Array<double>& Y,void (*func)(Array<M>& input));
 };
 //全连接网络生成
 FCLNet::FCLNet():layerVector()
 {
 }
-//添加一个层
+//添加一个层,默认在尾部增加
 bool FCLNet::Addlayer(BaseUnit<double>* newLayer,int Index)
 {
     if(NULL == newLayer)
     {
-        printf("Add layer is empty!\n");
+        LOG_ERR("Add layer is empty!")
     }
 
     if(true == layerVector.empty())
     {
         layerVector.push_back(newLayer);
     }
-    
-    std::vector<BaseUnit<double>*>::iterator it=layerVector.begin();
-    for(int i=0;it!=layerVector.end();it++,i++)
+    else
     {
-        if(i == Index)
+        std::vector<BaseUnit<double>*>::iterator it=layerVector.end();
+        for(int i=0;it!=layerVector.begin();it--,i++)
         {
-            break;
+            if(i == Index)
+            {
+                break;
+            }
         }
+        //插入
+        layerVector.insert(it,newLayer);
     }
 
-    layerVector.insert(it,newLayer);
     return true;
 }
-//输入数据，做全连接层计算
-bool run()
+//输入数据，做全连接层计算,返回最后一个计算数组
+Array<double> FCLNet::run(Array<double>& indata)
 {
+    int i = 0;
+    Array<double> tempdata = indata;
+    for(i=0;i<layerVector.size();i++)
+    {
+       tempdata = layerVector[i]->UnitFront(tempdata); 
+    }
+    return tempdata;
 }
 
-
+//训练方法,输入训练数据和损失函数
+template<class M>
+M FCLNet::train(Array<double>& X,Array<double>& Y,ActiveFun<M>* lossFun,bool enable)
+{
+    int i = 0;
+    //step 1:获取输出个数
+    BaseUnit<double>* outlayer = layerVector[layerVector.size()]; 
+    int outSize = outlayer->GOutSize();
+    //step 2:从损失函数，推倒出末端节点输入的Nextδ和NextWeight
+    //最后一层节点衍生一层，用来包括进统一框架做迭代处理
+    //  *->o 直接关系如左，o节点的δ由损失函数对o求导，并在y点处的值
+    //  *->o 而w，实际上可以看作衍生全连接层，对应关联的节点连接权值为1，其余的为0
+    //  *->o 因此构造的w是一个diag（1）单位矩阵，输出为最后一层输出的个数
+    Array<double> tempδ(1,outSize,0);
+    Array<double> tempw(outSize,outSize,0);
+    //step 3:初始化输入矩阵
+    tempw.diag(1);//W用1进行对角化
+    tempδ = lossFun->back(Y);//对矩阵Y每个元素执行func后，赋值给tempδ
+    
+    //step 4:反向传播迭代 of course from back to begin
+    for(i=layerVector.size();i>0;i--)
+    {
+        layerVector[i]->UnitBack(tempδ,tempw);
+        tempδ = layerVector.getδ();
+        tempw = layerVector.getw();
+    }
+    //返回本次训练后的当前的loss值
+    return enable?lossfun->front(run(X)):0;
+}
 
 
 //2卷积网络组件：
