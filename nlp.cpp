@@ -55,9 +55,9 @@ static Time DBGTime;
 /*********************************激活函数**********************************/
 //激活函数和损失函数抽象
 template<class T>
-class ActiveFun{
-        ActiveFun(){};
-        ~ActiveFun(){};
+class BaseFun{
+        BaseFun(){};
+        ~BaseFun(){};
 
         //前向运算
         virtual T front(T value)=0;
@@ -69,7 +69,7 @@ class ActiveFun{
 
 /*tanh激活函数*/
 template<class T>
-class TanhActivator:ActiveFun<T>{
+class TanhActivator:BaseFun<T>{
         TanhActivator(){};
         ~TanhActivator(){};
         //前向运算
@@ -101,7 +101,7 @@ Array<T> TanhActivator<T>::back(Array<T> array){
 
 /*Sigmoid激活函数*/
 template<class T>
-class SigmoidActivator:ActiveFun<T>{
+class SigmoidActivator:BaseFun<T>{
     SigmoidActivator();
     ~SigmoidActivator();
     //前向运算
@@ -134,7 +134,7 @@ Array<T> SigmoidActivator<T>::back(Array<T> array){
 /*********************************损失函数**********************************/
 /*平方差函数*/
 template<class T>
-class squareLoss:ActiveFun<T>{
+class squareLoss:BaseFun<T>{
         squareLoss(){};
         ~squareLoss(){};
         //前向运算
@@ -184,11 +184,11 @@ class NolinearUnit:public BaseUnit<T>{
         //单元当前输入值,m*1的数组
         Array<T>  InputValue;
         //单元激活函数
-        ActiveFun<T> *Active;
+        BaseFun<T> *Active;
         //单元初始化函数
         bool Paraminit(Array<T> value);
     public:
-        NolinearUnit(ActiveFun<T> *fun);
+        NolinearUnit(BaseFun<T> *fun);
         ~NolinearUnit();
 
         //单元流程
@@ -200,7 +200,7 @@ class NolinearUnit:public BaseUnit<T>{
 };
 
 template <class T,int m,int n>
-NolinearUnit<T,m,n>::NolinearUnit(ActiveFun<T> *fun):InputSize(m),
+NolinearUnit<T,m,n>::NolinearUnit(BaseFun<T> *fun):InputSize(m),
                                                     OutputSize(n),
                                                     weight(m,n,0),
                                                     bias(1,n,0),
@@ -259,7 +259,7 @@ class FCLNet{
         Array<double> run(Array<double>& indata);
         //反向传播,模版成员函数
         template <class M>
-        M train(Array<double>& X,Array<double>& Y,void (*func)(Array<M>& input));
+        M train(Array<double>& X,Array<double>& Y,BaseFun<M>* lossFun,bool enable);
 };
 //全连接网络生成
 FCLNet::FCLNet():layerVector()
@@ -307,7 +307,7 @@ Array<double> FCLNet::run(Array<double>& indata)
 
 //训练方法,输入训练数据和损失函数
 template<class M>
-M FCLNet::train(Array<double>& X,Array<double>& Y,ActiveFun<M>* lossFun,bool enable)
+M FCLNet::train(Array<double>& X,Array<double>& Y,BaseFun<M>* lossFun,bool enable)
 {
     int i = 0;
     //step 1:获取输出个数
