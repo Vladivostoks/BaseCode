@@ -7,22 +7,28 @@
 /******************************************************/
 #ifndef __MATRIX__H__
 #define __MATRIX__H__
+template <class M>
+class Array{
+    private:
+        /*@line&row*/
+        unsigned int line;
+        unsigned int row;
+        /*data address*/
+        char *address;
+    public:
+        Array(int num,int unitSize);
+        ~Array();
+        Array(Array const& A);
+        Array& operator=(Array const & A);
+
+         
 
 
-#ifdef __cplusplus
-extern "C"{
-#endif
 
 
-
-
-
-
-
-
-#ifdef __cplusplus
 };
-#endif
+
+
 #endif
 
 
