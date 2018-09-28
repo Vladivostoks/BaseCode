@@ -16,19 +16,16 @@ class Array{
         /*data address*/
         char *address;
     public:
-        Array(int num,int unitSize);
+        Array(unsigned int line,unsigned int row,M defaultValue);
         ~Array();
-        Array(Array const& A);
-        Array& operator=(Array const & A);
+        Array(const Array<M>& A);
+        //矩阵操作方法
+        Array<M>& operator=(const Array<M>& A);
+        Array<M>& T(Array& ArraySelf);
 
-         
-
-
-
-
+        //矩阵点乘
+        static Array<M> dot(const Array<M>& left,const Array<M>& right);
 };
-
-
 #endif
 
 

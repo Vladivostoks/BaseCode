@@ -38,7 +38,6 @@ Y υ [upsilon] 宇普西龙
 #include <sstream>
 #include <iostream>
 
-#include "Array.h"
 #include "Matrix.h"
 #include "sysTool.h"
 
@@ -226,7 +225,7 @@ Array<T> NolinearUnit<T,m,n>::UnitFront(const Array<T> input)
     //记录输入值
     InputValue = input;
     //输入进行矩阵运算
-    Array<T> result = Matrix.dot(weight.T()).T()+bias;
+    Array<T> result = Array<T>::dot(weight.T()).T()+bias;
     return Active->front(result);
 }
 
@@ -235,7 +234,7 @@ Array<T> NolinearUnit<T,m,n>::UnitBack(Array<T> Nextδ,Array<T> NextWeight)
 {
     //更新权重,权重为和此节点下游连接所有节点的权重和δ值,假设下游节点k个，权重矩阵为n*k，误差项为1*k个
     //step 1:计算loss对单元输入导数的误差项
-    δ = Active->back(Out)*Matrix.dot(NextWeight,Nextδ.T()).T();
+    δ = Active->back(Out)*Array<T>::dot(NextWeight,Nextδ.T()).T();
     //step 2:更新权重矩阵 m*1 dot 1*n 为梯度
     weight = weight-η*InputValue*δ;
     //step 3:更新偏置矩阵 
@@ -248,8 +247,6 @@ class FCLNet{
     private:
         //vector存储所有层
         std::vector<BaseUnit<double>*> layerVector;
-        //损失函数
-        Fuction lossfun;
     public:
         FCLNet();
         ~FCLNet();
@@ -328,11 +325,11 @@ M FCLNet::train(Array<double>& X,Array<double>& Y,BaseFun<M>* lossFun,bool enabl
     for(i=layerVector.size();i>0;i--)
     {
         layerVector[i]->UnitBack(tempδ,tempw);
-        tempδ = layerVector.getδ();
-        tempw = layerVector.getw();
+        tempδ = layerVector[i]->getδ();
+        tempw = layerVector[i]->getw();
     }
     //返回本次训练后的当前的loss值
-    return enable?lossfun->front(run(X)):0;
+    return enable?lossFun->front(run(X)):0;
 }
 
 
