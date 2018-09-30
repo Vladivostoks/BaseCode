@@ -15,24 +15,56 @@
 
 #include "sysTool.h"
 
-static Time DBGTime;
-#define LOG_ERR(x) std::cout<<"["<<DBGTime.GetSTime()<<"][ERROR]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
-#define LOG_WARN(x) std::cout<<"["<<DBGTime.GetSTime()<<"][WARN]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
-#define LOG_INFO(x) std::cout<<"["<<DBGTime.GetSTime()<<"][INFO]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
+#define LOG_ERR(x) std::cout<<"["<<Array<M>::DBGTime.GetSTime()<<"][ERROR]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
+#define LOG_WARN(x) std::cout<<"["<<Array<M>::DBGTime.GetSTime()<<"][WARN]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
+#define LOG_INFO(x) std::cout<<"["<<Array<M>::DBGTime.GetSTime()<<"][INFO]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
 
 
 template <class M>
 class Array{
     protected:
+        static Time DBGTime;
         /*嵌套类，向量*/
         class Vector{ 
             private:
-                M* indexaddr;
+                unsigned int totalline;
+                unsigned int totalrow;
+                bool flagT;
             public:
-                Vector(){};
+                //索引目标起始地址 
+                M* dataAddr;
+                //索引行
+                unsigned int indexline;
+                unsigned int indexrow;
+                Vector(unsigned int totalLine,unsigned int totalRow,M* addr):dataAddr(addr),
+                                                                            totalline(totalLine),
+                                                                            totalrow(totalRow),
+                                                                            flagT(false)
+                {};
                 ~Vector(){};
-                M operator[](unsigned int index);
+                bool setIndexParam(unsigned int line,bool Tflag)
+                {
+                    indexline = line;
+                    return true;
+                }
+                M operator[](unsigned int RowIndex)
+                {
+                    M ret = 0;
+                    //Vector存向量列索引
+                    indexrow = RowIndex;
+                    if(flagT)
+                    {
+                        //内存行连续存储,转至后行为列,按照索引先切行列找切对应列
+                        ret = *((dataAddr+indexrow*totalrow)+indexline);
+                    }
+                    else
+                    {
+                        //内存行连续存储,不转至，正常索引，按照索引行，切对应列
+                        ret = *(dataAddr+indexrow+(indexline*totalrow));
+                    }
+                }
         };
+                
     private:
         /*@line&row*/
         unsigned int Line;
@@ -41,7 +73,8 @@ class Array{
         bool flagT;
         /*data address*/
         M *address;
-        Vector* IndexVector;
+        /*data index*/
+        Vector Index;
         /*apply space size*/
         unsigned long spaceSize;
     public:
@@ -50,6 +83,7 @@ class Array{
         //copy function
         Array(const Array<M>& A);
         template <class K> Array(const Array<K>& A);
+
         //set value function
         Array<M>& operator=(const Array<M>& A);
         template <class K> Array<M>& operator=(const Array<K>& A);
@@ -63,36 +97,38 @@ class Array{
 
 template <class M>
 Array<M>::Array(unsigned int line,unsigned int row,M defaultValue):Line(line),
-                                                                   Row(line),
+                                                                   Row(row),
                                                                    flagT(false),
                                                                    address(NULL),
-                                                                   IndexVector(NULL),
+                                                                   Index(Line,Row,NULL),
                                                                    spaceSize(0)
 {
     //非异常抛出new
-    address = new(std::nothrow) M[Line*Row];
-    //申请行列里最大的索引指针
-    IndexVector = new(std::nothrow) Vector<M>[Line>Row?Line:Row];
+    if(0 != Line*Row)
+    {
+        address = new(std::nothrow) M[Line*Row];
 
-    if(NULL == address || NULL == IndexVector)
-    {
-        LOG_ERR("Array alloc sapce failed!!!!");
-    }
-    else
-    {
-        int i=0;
-        if(defaultValue)
+        if(NULL == address)
         {
-            for(i=0;i<Line*Row;i++)
-            {
-                address = defaultValue;
-            }
+            LOG_ERR("Array alloc sapce failed!!!!");
         }
         else
         {
-            memset(reinterpret_cast<void *>(address),0,sizeof(M)*Line*Row);
+            int i=0;
+            Index.dataAddr = address;
+            if(defaultValue)
+            {
+                for(i=0;i<Line*Row;i++)
+                {
+                    *(address+i) = defaultValue;
+                }
+            }
+            else
+            {
+                memset(reinterpret_cast<void *>(address),0,sizeof(M)*Line*Row);
+            }
+            spaceSize = sizeof(M)*Line*Row;
         }
-        spaceSize = sizeof(M)*Line*Row;
     }
 }
 
@@ -103,23 +139,76 @@ Array<M>::~Array()
     {
         delete[] address;
     }
+
+    if(NULL != Index)
+    {
+        delete[] Index;
+    }
 }
 
 //same type deep copy
 template <class M>
-Array<M>::Array(const Array<M>& A)
+Array<M>::Array(const Array<M>& A):Line(A.Line),
+                                   Row(A.row),
+                                   flagT(A.flagT),
+                                   address(NULL),
+                                   Index(Line,Row,NULL),
+                                   spaceSize(0)
 {
     //deep copy
-    //step 1 compare address size
+    if(0 != Line*Row)
+    {
+        address = new(std::nothrow) M[Line*Row];
+
+        if(NULL == address)
+        {
+            LOG_ERR("Array alloc sapce failed!!!!");
+        }
+        else
+        {
+            Index.dataAddr = address;
+            spaceSize = sizeof(M)*Line*Row;
+            memcpy(address,A.address,A.spaceSize);
+        }
+    }
 }
 
 
 //different type deep copy
 template <class M>
-template <class K> Array<M>::Array(const Array<K>& A)
+template <class K> Array<M>::Array(const Array<K>& A):Line(A.Line),
+                                                      Row(A.row),
+                                                      flagT(A.flagT),
+                                                      address(NULL),
+                                                      Index(Line,Row,NULL),
+                                                      spaceSize(0)
 {
+   LOG_WARN("Array copy between different type");
+   //deep copy
+    if(0 != Line*Row)
+    {
+        address = new(std::nothrow) M[Line*Row];
 
-    
+        if(NULL == address)
+        {
+            LOG_ERR("Array alloc sapce failed!!!!");
+        }
+        else
+        {
+            int i=0,j=0;
+            Index.dataAddr = address;
+            spaceSize = sizeof(M)*Line*Row;
+            //copy value
+            for(i=0;i<Line;i++)
+            {
+                for(j=0;j<Row;j++)
+                {
+                    this->operator[](i)[j] = A[i][j];
+                }
+            }
+            
+        }
+    }
 }
 
 template <class M>
@@ -127,22 +216,22 @@ Array<M>& Array<M>::operator=(const Array<M>& A)
 {
 }
 
+template <class M>
+typename Array<M>::Vector& Array<M>::operator[](unsigned int LineIndex)
+{
+    Index.setIndexParam(LineIndex,flagT);
+    return Index;
+}
 
 template <class M>
 Array<M>& Array<M>::T()
 {
     flagT = !flagT;
-
 }
+
 
 template <class M>
 Array<M> Array<M>::dot(const Array<M>& left,const Array<M>& right)
 {
 }
 
-template <class M>
-typename Array<M>::Vector& Array<M>::operator[](unsigned int index)
-{
-    Vector* tempIndexVector = IndexVector+index;
-    return *tempIndexVector;
-}
