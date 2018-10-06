@@ -40,16 +40,11 @@ Y υ [upsilon] 宇普西龙
 
 #include "Matrix.h"
 #include "sysTool.h"
-
-static Time DBGTime;
-#define LOG_ERR(x) std::cout<<"["<<DBGTime.GetSTime()<<"][ERROR]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
-#define LOG_WARN(x) std::cout<<"["<<DBGTime.GetSTime()<<"][WARN]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
-#define LOG_INFO(x) std::cout<<"["<<DBGTime.GetSTime()<<"][INFO]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
+#include "General.h"
 
 /*********************************配置选项**********************************/
 //学习率
 #define η   0.1
-
 
 /*********************************激活函数**********************************/
 //激活函数和损失函数抽象

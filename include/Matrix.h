@@ -16,12 +16,6 @@
 #include "sysTool.h"
 #include "General.h"
 
-extern Time DBGTime;
-
-#define MATRIX_LOG_ERR(x) std::cout<<"["<<DBGTime.GetSTime()<<"][ERROR]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
-#define MATRIX_LOG_WARN(x) std::cout<<"["<<DBGTime.GetSTime()<<"][WARN]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
-#define MATRIX_LOG_INFO(x) std::cout<<"["<<DBGTime.GetSTime()<<"][INFO]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
-
 template <class M>
 class Array{
     protected:
@@ -77,7 +71,7 @@ class Array{
                     M* ret = NULL;
                     if(NULL == dataAddr)
                     {
-                       MATRIX_LOG_ERR("Vector's addr is NULL");
+                       LOG_ERR("Vector's addr is NULL");
                     }
                     //Vector存向量列索引
                     indexrow = RowIndex;
@@ -97,7 +91,7 @@ class Array{
                 {
                     if(NULL == dataAddr)
                     {
-                        MATRIX_LOG_ERR("Vector's addr is NULL");
+                        LOG_ERR("Vector's addr is NULL");
                     }
                     if(false == flagT)
                     {
@@ -121,7 +115,7 @@ class Array{
                         }
                         return tempArray;
                     }
-                    MATRIX_LOG_ERR("No Array V return");
+                    LOG_ERR("No Array V return");
                     return NULL;
                 }
         };
@@ -176,7 +170,7 @@ Array<M>::Array(unsigned int line,unsigned int row,M defaultValue):Line(line),
 
         if(NULL == address)
         {
-            MATRIX_LOG_ERR("Array alloc sapce failed!!!!");
+            LOG_ERR("Array alloc sapce failed!!!!");
         }
         else
         {
@@ -224,7 +218,7 @@ Array<M>::Array(const Array<M>& A):Line(A.Line),
 
         if(NULL == address)
         {
-            MATRIX_LOG_ERR("Array alloc sapce failed!!!!");
+            LOG_ERR("Array alloc sapce failed!!!!");
         }
         else
         {
@@ -245,7 +239,7 @@ template <class K> Array<M>::Array(const Array<K>& A):Line(A.Line),
                                                       Index(Line,Row,NULL),
                                                       spaceSize(0)
 {
-    MATRIX_LOG_WARN("Array copy between different type");
+    LOG_WARN("Array copy between different type");
     //deep copy
     if(0 != Line*Row)
     {
@@ -253,7 +247,7 @@ template <class K> Array<M>::Array(const Array<K>& A):Line(A.Line),
 
         if(NULL == address)
         {
-            MATRIX_LOG_ERR("Array alloc sapce failed!!!!");
+            LOG_ERR("Array alloc sapce failed!!!!");
         }
         else
         {
@@ -287,7 +281,7 @@ Array<M>& Array<M>::operator=(const Array<M>& A)
 
             if(NULL == address)
             {
-                MATRIX_LOG_ERR("Array alloc sapce failed!!!!");
+                LOG_ERR("Array alloc sapce failed!!!!");
             }
             else
             {
@@ -321,7 +315,7 @@ Array<M>& Array<M>::operator=(const Array<M>& A)
 template <class M>
 template <class K> Array<M>& Array<M>::operator=(const Array<K>& A)
 {
-    MATRIX_LOG_WARN("Array = between different type");
+    LOG_WARN("Array = between different type");
     //force apply mem again
     ~Array();
     //apply again & copy
@@ -331,7 +325,7 @@ template <class K> Array<M>& Array<M>::operator=(const Array<K>& A)
 
         if(NULL == address)
         {
-            MATRIX_LOG_ERR("Array alloc sapce failed!!!!");
+            LOG_ERR("Array alloc sapce failed!!!!");
         }
         else
         {
@@ -381,7 +375,7 @@ Array<M> Array<M>::dot(const Array<M>& left,const Array<M>& right)
     //矩阵点乘法
     if(left.getRow() != right.gerLine())
     {
-        MATRIX_LOG_ERR("Array dot illigal,left row is not same with right line");
+        LOG_ERR("Array dot illigal,left row is not same with right line");
     }
     //same result
     Array<M> tempArray(i,j,0);
@@ -405,7 +399,7 @@ Array<M>& Array<M>::diag(const M Value)
     //矩阵对角化
     if(Line != Row)
     {
-       MATRIX_LOG_ERR("Array is not a square matrix!");
+       LOG_ERR("Array is not a square matrix!");
        return *this;
     }
     else
@@ -428,7 +422,7 @@ Array<M> Array<M>::operator*(M Value)
     int j = 0;
     if(NULL != address)
     {
-        MATRIX_LOG_ERR("data address is NULL");
+        LOG_ERR("data address is NULL");
     }
     Array<M> tempArray(Line,Row,0);
     for(i=0;i<Line;i++)
