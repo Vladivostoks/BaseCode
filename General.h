@@ -8,7 +8,9 @@
 #ifndef __GENERAL__H__
 #define __GENERAL__H__
 
+#ifndef NULL
 #define NULL ((void *)0)
+#endif
 
 
 

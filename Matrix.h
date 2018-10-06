@@ -1,6 +1,6 @@
 /******************************************************/
 //-*-coding-utf-8-*-
-//File:Matrix.cpp
+//File:Matrix.h
 //Date:2018-09-11
 //Author:Ayden.Shu
 //brief: base function about Matrix
@@ -16,15 +16,15 @@
 #include "sysTool.h"
 #include "General.h"
 
-#define LOG_ERR(x) std::cout<<"["<<Array<M>::DBGTime.GetSTime()<<"][ERROR]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
-#define LOG_WARN(x) std::cout<<"["<<Array<M>::DBGTime.GetSTime()<<"][WARN]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
-#define LOG_INFO(x) std::cout<<"["<<Array<M>::DBGTime.GetSTime()<<"][INFO]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
+extern Time DBGTime;
 
+#define MATRIX_LOG_ERR(x) std::cout<<"["<<DBGTime.GetSTime()<<"][ERROR]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
+#define MATRIX_LOG_WARN(x) std::cout<<"["<<DBGTime.GetSTime()<<"][WARN]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
+#define MATRIX_LOG_INFO(x) std::cout<<"["<<DBGTime.GetSTime()<<"][INFO]<"<<__FILE__<<"><"<<__LINE__<<">"<<x<<std::endl;
 
 template <class M>
 class Array{
     protected:
-        static Time DBGTime;
         /*嵌套类，向量*/
         class Vector{ 
             private:
@@ -39,12 +39,23 @@ class Array{
             public:
                 //索引目标起始地址 
                 M* dataAddr;
-                Vector(unsigned int totalLine,unsigned int totalRow,M* addr):dataAddr(addr),
-                                                                            totalline(totalLine),
-                                                                            totalrow(totalRow),
-                                                                            flagT(false)
+                Vector(unsigned int totalLine,unsigned int totalRow,M* addr):totalline(totalLine),
+                                                                             totalrow(totalRow),
+                                                                             flagT(false),
+                                                                             indexline(0),
+                                                                             indexrow(0),
+                                                                             dataAddr(addr)
                 {};
                 ~Vector(){};
+                bool reset()
+                {
+                    dataAddr = NULL;
+                    flagT = false;
+                    totalline = 0;
+                    totalrow = 0;
+                    indexline = 0;
+                    indexrow = 0;
+                };
                 Vector& operator =(const Vector& V)
                 {
                    //not copy address 
@@ -64,6 +75,10 @@ class Array{
                 M* operator[](unsigned int RowIndex)
                 {
                     M* ret = NULL;
+                    if(NULL == dataAddr)
+                    {
+                       MATRIX_LOG_ERR("Vector's addr is NULL");
+                    }
                     //Vector存向量列索引
                     indexrow = RowIndex;
                     if(flagT)
@@ -76,6 +91,38 @@ class Array{
                         //内存行连续存储,不转至，正常索引，按照索引行，切对应列
                         ret = (dataAddr+indexrow+(indexline*totalrow));
                     }
+                }
+                //返回当前行的向量
+                Array<M> V()
+                {
+                    if(NULL == dataAddr)
+                    {
+                        MATRIX_LOG_ERR("Vector's addr is NULL");
+                    }
+                    if(false == flagT)
+                    {
+                        //返回转至后的行，也就是1*line
+                        Array<M> tempArray(1,totalline,0);
+                        int i =0; 
+                        for(i=0;i<totalline;i++)
+                        {
+                           *tempArray[0][i] = *(*this)[i];
+                        }
+                        return tempArray;
+                    }
+                    else
+                    { 
+                        //返回行，也就是1*row
+                        Array<M> tempArray(1,totalrow,0);
+                        int i =0; 
+                        for(i=0;i<totalrow;i++)
+                        {
+                           *tempArray[0][i] = *(*this)[i];
+                        }
+                        return tempArray;
+                    }
+                    MATRIX_LOG_ERR("No Array V return");
+                    return NULL;
                 }
         };
                 
@@ -91,6 +138,9 @@ class Array{
         Vector Index;
         /*apply space size*/
         unsigned long spaceSize;
+        
+        unsigned int getLine(){if(flagT){return Row;} return Line;};
+        unsigned int getRow(){if(flagT){return Line;} return Row;};
     public:
         Array(unsigned int line,unsigned int row,M defaultValue);
         ~Array();
@@ -101,12 +151,14 @@ class Array{
         //set value function
         Array<M>& operator=(const Array<M>& A);
         template <class K> Array<M>& operator=(const Array<K>& A);
-
+        Vector& operator[](unsigned int index);
+        Array<M> operator*(M Value);
+        template<class K> 
+        friend Array<K> operator*(K Value,Array<K>& A);
         //matrix function
         Array<M>& T();
         static Array<M> dot(const Array<M>& left,const Array<M>& right);
-        Vector& operator[](unsigned int index);
-
+        Array<M>& diag(const M Value);
 };
 
 template <class M>
@@ -124,7 +176,7 @@ Array<M>::Array(unsigned int line,unsigned int row,M defaultValue):Line(line),
 
         if(NULL == address)
         {
-            LOG_ERR("Array alloc sapce failed!!!!");
+            MATRIX_LOG_ERR("Array alloc sapce failed!!!!");
         }
         else
         {
@@ -154,21 +206,15 @@ Array<M>::~Array()
         delete[] address;
         address = NULL;
     }
-
-    if(NULL != Index)
-    {
-        delete[] Index;
-        Index = NULL;
-    }
 }
 
 //same type deep copy
 template <class M>
 Array<M>::Array(const Array<M>& A):Line(A.Line),
-                                   Row(A.row),
+                                   Row(A.Row),
                                    flagT(A.flagT),
                                    address(NULL),
-                                   Index(Line,Row,NULL),
+                                   Index(A.Line,A.Row,NULL),
                                    spaceSize(0)
 {
     //deep copy
@@ -178,7 +224,7 @@ Array<M>::Array(const Array<M>& A):Line(A.Line),
 
         if(NULL == address)
         {
-            LOG_ERR("Array alloc sapce failed!!!!");
+            MATRIX_LOG_ERR("Array alloc sapce failed!!!!");
         }
         else
         {
@@ -199,7 +245,7 @@ template <class K> Array<M>::Array(const Array<K>& A):Line(A.Line),
                                                       Index(Line,Row,NULL),
                                                       spaceSize(0)
 {
-    LOG_WARN("Array copy between different type");
+    MATRIX_LOG_WARN("Array copy between different type");
     //deep copy
     if(0 != Line*Row)
     {
@@ -207,7 +253,7 @@ template <class K> Array<M>::Array(const Array<K>& A):Line(A.Line),
 
         if(NULL == address)
         {
-            LOG_ERR("Array alloc sapce failed!!!!");
+            MATRIX_LOG_ERR("Array alloc sapce failed!!!!");
         }
         else
         {
@@ -219,7 +265,7 @@ template <class K> Array<M>::Array(const Array<K>& A):Line(A.Line),
             {
                 for(j=0;j<Row;j++)
                 {
-                    *this->operator[](i)[j] = *A[i][j];
+                    *(*this)[i][j] = *A[i][j];
                 }
             }
             
@@ -233,7 +279,7 @@ Array<M>& Array<M>::operator=(const Array<M>& A)
     //if size is diff ,delete space and apply again
     if(spaceSize != A.spaceSize)
     {
-        ~Array<M>();
+        ~Array();
         //apply again & copy
         if(0 != A.Line*A.Row)
         {
@@ -241,7 +287,7 @@ Array<M>& Array<M>::operator=(const Array<M>& A)
 
             if(NULL == address)
             {
-                LOG_ERR("Array alloc sapce failed!!!!");
+                MATRIX_LOG_ERR("Array alloc sapce failed!!!!");
             }
             else
             {
@@ -275,9 +321,9 @@ Array<M>& Array<M>::operator=(const Array<M>& A)
 template <class M>
 template <class K> Array<M>& Array<M>::operator=(const Array<K>& A)
 {
-    LOG_WARN("Array = between different type");
+    MATRIX_LOG_WARN("Array = between different type");
     //force apply mem again
-    ~Array<M>();
+    ~Array();
     //apply again & copy
     if(0 != A.Line*A.Row)
     {
@@ -285,7 +331,7 @@ template <class K> Array<M>& Array<M>::operator=(const Array<K>& A)
 
         if(NULL == address)
         {
-            LOG_ERR("Array alloc sapce failed!!!!");
+            MATRIX_LOG_ERR("Array alloc sapce failed!!!!");
         }
         else
         {
@@ -329,5 +375,74 @@ Array<M>& Array<M>::T()
 template <class M>
 Array<M> Array<M>::dot(const Array<M>& left,const Array<M>& right)
 {
+    int i = left.getLine();
+    int j = right.getRow();
+
+    //矩阵点乘法
+    if(left.getRow() != right.gerLine())
+    {
+        MATRIX_LOG_ERR("Array dot illigal,left row is not same with right line");
+    }
+    //same result
+    Array<M> tempArray(i,j,0);
+    for(j=0;j<right.getRow();j++)
+    {
+        for(i=0;i<left.getLine();i++)
+        {
+            int k = 0;
+            for(k=0;k<right.getLine();k++)
+            {
+                //新列向量为之前列向量乘转移矩阵的
+                (*tempArray[i][j]) += (*left[i][k]) * (*right[k][j]);
+            }
+        }
+    }
 }
 
+template <class M>
+Array<M>& Array<M>::diag(const M Value)
+{
+    //矩阵对角化
+    if(Line != Row)
+    {
+       MATRIX_LOG_ERR("Array is not a square matrix!");
+       return *this;
+    }
+    else
+    {
+        int i=0;
+        for(i=0;i<Line;i++)
+        {
+            *(*this)[i][i] = Value;
+        }
+    }
+    return *this;
+}
+
+
+//数乘
+template <class M>
+Array<M> Array<M>::operator*(M Value)
+{
+    int i = 0;
+    int j = 0;
+    if(NULL != address)
+    {
+        MATRIX_LOG_ERR("data address is NULL");
+    }
+    Array<M> tempArray(Line,Row,0);
+    for(i=0;i<Line;i++)
+    {
+        for(j=0;j<Row;j++)
+        {
+            *tempArray[i][j] *= Value;
+        }
+    }
+    return tempArray;
+}
+
+template<class K>
+Array<K> operator*(K Value,Array<K>& A)
+{
+    return A*Value;    
+}
