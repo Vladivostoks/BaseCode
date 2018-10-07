@@ -22,13 +22,14 @@ TRACE_AR = @echo "	AR	" $@
 
 OBJPATH += ./obj
 SRCPATH += ./src
-LIBPATH += 
+LIBPATH += $(PREFIX)/lib
 BINPATH += $(PREFIX)/bin
 
 SRCFIEL += $(wildcard $(SRCPATH)/*.cpp)
 SRCFIEL += $(wildcard $(SRCPATH)/*.c)
 
 OBJFILE += $(addprefix $(OBJPATH)/,$(patsubst %.c,%.o,$(notdir SRCFILE)))
+OBJFILE += $(addprefix $(OBJPATH)/,$(patsubst %.cpp,%.o,$(notdir SRCFILE)))
 LIBFILE += 
 
 CFLAG += -Wall -O3
@@ -37,17 +38,17 @@ CFLAG += -I ./include
 CPPFLAG += -Wall -O3
 CPPFLAG += -I ./include
 
-LDFLAG +=  ${addprfix -l,$(LIBFILE)}
+#LDFLAG +=  ${addprfix -l,$(LIBFILE)}
 
 
 all:director $(LIBFILE) demo
 
-$(OBJPATH)/*.o:$(SRCPATH)/*.c
+$(OBJPATH)/%.o:$(SRCPATH)/%.c
 	$(TARCE_CC)
 	$(Q)$(CC) $(CFLAG) -c $^ -o $@
 
 
-$(OBJPATH)/*.o:$(SRCPATH)/*.cpp
+$(OBJPATH)/%.o:$(SRCPATH)/%.cpp
 	$(TARCE_CCP)
 	$(Q)$(CCP) $(CPPFLAG) -c $^ -o $@
 
@@ -64,5 +65,6 @@ director:
 	@mkdir -p $(OBJPATH) $(PREFIX)/$(LIBPATH) $(PREFIX)/$(BINPATH)
 
 clean:
-	rm ./$(OBJPATH)/*.o $(PREFIX)/$(LIBPATH)/*.a $(PREFIX)/$(LIBPATH)/*.so $(PREFIX)/$(BINPATH)/*
-	rmdir ./$(OBJPATH) $(PREFIX)/$(LIBPATH) $(PREFIX)/$(BINPATH)
+#-rm $(OBJPATH)/*.o $(LIBPATH)/*.a $(LIBPATH)/*.so $(BINPATH)/*
+	-rm -rf $(OBJPATH) $(LIBPATH) $(BINPATH)
+	
