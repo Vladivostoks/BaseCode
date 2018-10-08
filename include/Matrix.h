@@ -273,7 +273,7 @@ Array<M>& Array<M>::operator=(const Array<M>& A)
     //if size is diff ,delete space and apply again
     if(spaceSize != A.spaceSize)
     {
-        ~Array();
+        this->~Array();
         //apply again & copy
         if(0 != A.Line*A.Row)
         {

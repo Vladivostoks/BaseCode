@@ -257,6 +257,18 @@ class FCLNet{
 FCLNet::FCLNet():layerVector()
 {
 }
+
+FCLNet::~FCLNet()
+{
+    //析构所有层
+    for(int i=0;i<layerVector.size();i++)
+    {
+        if(NULL != layerVector[i])
+        {
+           delete layerVector[i]; 
+        }
+    }
+}
 //添加一个层,默认在尾部增加
 bool FCLNet::Addlayer(BaseUnit<double>* newLayer,int Index)
 {

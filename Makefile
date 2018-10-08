@@ -25,17 +25,17 @@ SRCPATH += ./src
 LIBPATH += $(PREFIX)/lib
 BINPATH += $(PREFIX)/bin
 
-SRCFIEL += $(wildcard $(SRCPATH)/*.cpp)
-SRCFIEL += $(wildcard $(SRCPATH)/*.c)
+SRCFILE += $(wildcard $(SRCPATH)/*.cpp)
+SRCFILE += $(wildcard $(SRCPATH)/*.c)
 
-OBJFILE += $(addprefix $(OBJPATH)/,$(patsubst %.c,%.o,$(notdir SRCFILE)))
-OBJFILE += $(addprefix $(OBJPATH)/,$(patsubst %.cpp,%.o,$(notdir SRCFILE)))
+OBJFILE += $(addprefix $(OBJPATH)/,$(filter %.o,$(patsubst %.c,%.o,$(notdir $(SRCFILE)))))
+OBJFILE += $(addprefix $(OBJPATH)/,$(filter %.o,$(patsubst %.cpp,%.o,$(notdir $(SRCFILE)))))
+
 LIBFILE += 
-
 CFLAG += -Wall -O3
 CFLAG += -I ./include
 
-CPPFLAG += -Wall -O3
+CPPFLAG += -Wall -O3 -lstdc++
 CPPFLAG += -I ./include
 
 #LDFLAG +=  ${addprfix -l,$(LIBFILE)}
@@ -54,6 +54,8 @@ $(OBJPATH)/%.o:$(SRCPATH)/%.cpp
 
 
 demo:$(OBJFILE)
+	@echo Start Building demo....
+	@echo Source file include $(SRCFILE)
 	$(TRACE_LD)
 	$(Q)$(LD) $(LDFILE) $^ -o $(PRFIX)/$(BINPATH)/$@
 #	$(Q)$(STRIP) $@ -o $@.striped

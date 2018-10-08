@@ -18,6 +18,7 @@ this is ANN BaseCode for myself to learn about **ANN**
 ~~~
 
 ###Brief
+
 in **include** director is project head file
 
 		General.h:
@@ -36,7 +37,8 @@ in **src** director is project srouce file
         sysTool.cpp:
             include sysTool source code like timestamp
 
-##Makefile
+###Makefile
+
 use **make** in project root dir to build aim
 
     make
