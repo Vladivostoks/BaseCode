@@ -5,6 +5,9 @@
 //Author:Ayden.Shu
 //brief: base function about Matrix
 /******************************************************/
+#ifndef __MATRIX__H_
+#define __MATRIX__H_
+
 #include <new>
 #include <cmath>
 #include <vector>
@@ -440,3 +443,5 @@ Array<K> operator*(K Value,Array<K>& A)
 {
     return A*Value;    
 }
+
+#endif

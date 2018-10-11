@@ -35,21 +35,21 @@ LIBFILE +=
 CFLAG += -Wall -O3
 CFLAG += -I ./include
 
-CPPFLAG += -Wall -O3 -lstdc++
+CPPFLAG += -Wall -O3 
 CPPFLAG += -I ./include
 
 #LDFLAG +=  ${addprfix -l,$(LIBFILE)}
-
+LDFLAG += -lstdc++
 
 all:director $(LIBFILE) demo
 
 $(OBJPATH)/%.o:$(SRCPATH)/%.c
-	$(TARCE_CC)
+	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAG) -c $^ -o $@
 
 
 $(OBJPATH)/%.o:$(SRCPATH)/%.cpp
-	$(TARCE_CCP)
+	$(TRACE_CCP)
 	$(Q)$(CCP) $(CPPFLAG) -c $^ -o $@
 
 
@@ -57,7 +57,7 @@ demo:$(OBJFILE)
 	@echo Start Building demo....
 	@echo Source file include $(SRCFILE)
 	$(TRACE_LD)
-	$(Q)$(LD) $(LDFILE) $^ -o $(PRFIX)/$(BINPATH)/$@
+	$(Q)$(LD) $(LDFLAG) $^ -o $(PRFIX)/$(BINPATH)/$@
 #	$(Q)$(STRIP) $@ -o $@.striped
 
 #virtual aim

@@ -5,6 +5,8 @@
 //Author:Ayden.Shu
 //brief:ANN base
 /******************************************************/
+#ifndef __ANN__H__
+#define __ANN__H__
 /*
 Α α [alpha] 阿尔法
 Β β [beta] 贝塔
@@ -354,4 +356,4 @@ M FCLNet::train(Array<double>& X,Array<double>& Y,BaseFun<M>* lossFun,bool enabl
 //1-A 非线性单元
 
 
-
+#endif
