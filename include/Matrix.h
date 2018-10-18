@@ -69,9 +69,8 @@ class Array{
                     indexline = line;
                     return true;
                 }
-                M* operator[](unsigned int RowIndex)
+                M& operator[](unsigned int RowIndex)
                 {
-                    M* ret = NULL;
                     if(NULL == dataAddr)
                     {
                        LOG_ERR("Vector's addr is NULL");
@@ -81,13 +80,12 @@ class Array{
                     if(flagT)
                     {
                         //内存行连续存储,转至后行为列,按照索引先切行列找切对应列
-                        ret = ((dataAddr+indexrow*totalrow)+indexline);
+                        M& ret = *((dataAddr+indexrow*totalrow)+indexline);
+                        return ret;
                     }
-                    else
-                    {
-                        //内存行连续存储,不转至，正常索引，按照索引行，切对应列
-                        ret = (dataAddr+indexrow+(indexline*totalrow));
-                    }
+                    //内存行连续存储,不转至，正常索引，按照索引行，切对应列
+                    M& ret = *(dataAddr+indexrow+(indexline*totalrow));
+                    return ret;
                 }
                 //返回当前行的向量
                 Array<M> V()
@@ -124,7 +122,7 @@ class Array{
         };
                 
     private:
-        /*@line&row*/
+        /*static line&row*/
         unsigned int Line;
         unsigned int Row;
         /*T flag*/
@@ -143,19 +141,29 @@ class Array{
         ~Array();
         //copy function
         Array(const Array<M>& A);
+
         template <class K> Array(const Array<K>& A);
 
         //set value function
         Array<M>& operator=(const Array<M>& A);
+
         template <class K> Array<M>& operator=(const Array<K>& A);
+
         Vector& operator[](unsigned int index);
-        Array<M> operator*(M Value);
-        template<class K> 
-        friend Array<K> operator*(K Value,Array<K>& A);
+
+        template <class K> Array<M> operator*(K Value);
+
+        template<class K,class J> friend Array<J> operator*(K Value,Array<J>& A);
+
         //matrix function
         Array<M>& T();
+
         static Array<M> dot(const Array<M>& left,const Array<M>& right);
+
         Array<M>& diag(const M Value);
+
+        //矩阵打印
+        void show();
 };
 
 template <class M>
@@ -262,7 +270,7 @@ template <class K> Array<M>::Array(const Array<K>& A):Line(A.Line),
             {
                 for(j=0;j<Row;j++)
                 {
-                    *(*this)[i][j] = *A[i][j];
+                    (*this)[i][j] = A[i][j];
                 }
             }
             
@@ -376,7 +384,7 @@ Array<M> Array<M>::dot(const Array<M>& left,const Array<M>& right)
     int j = right.getRow();
 
     //矩阵点乘法
-    if(left.getRow() != right.gerLine())
+    if(left.getRow() != right.getLine())
     {
         LOG_ERR("Array dot illigal,left row is not same with right line");
     }
@@ -390,7 +398,7 @@ Array<M> Array<M>::dot(const Array<M>& left,const Array<M>& right)
             for(k=0;k<right.getLine();k++)
             {
                 //新列向量为之前列向量乘转移矩阵的
-                (*tempArray[i][j]) += (*left[i][k]) * (*right[k][j]);
+                tempArray[i][j] += left[i][k] * right[k][j];
             }
         }
     }
@@ -410,7 +418,7 @@ Array<M>& Array<M>::diag(const M Value)
         int i=0;
         for(i=0;i<Line;i++)
         {
-            *(*this)[i][i] = Value;
+            (*this)[i][i] = Value;
         }
     }
     return *this;
@@ -419,7 +427,7 @@ Array<M>& Array<M>::diag(const M Value)
 
 //数乘
 template <class M>
-Array<M> Array<M>::operator*(M Value)
+template <class K> Array<M> Array<M>::operator*(K Value)
 {
     int i = 0;
     int j = 0;
@@ -432,16 +440,33 @@ Array<M> Array<M>::operator*(M Value)
     {
         for(j=0;j<Row;j++)
         {
-            *tempArray[i][j] *= Value;
+            tempArray[i][j] *= Value;
         }
     }
     return tempArray;
 }
 
-template<class K>
-Array<K> operator*(K Value,Array<K>& A)
+template<class K,class J>
+Array<J> operator*(K Value,Array<J>& A)
 {
     return A*Value;    
 }
 
+
+template<class M>
+void Array<M>::show()
+{
+    int i=0,j=0;
+
+    for(i=0;i<getLine();i++)
+    {
+        printf("[");
+        for(j=0;j<getRow();j++)
+        {
+            printf("%f ",(*this)[i][j]);
+        }
+        printf("]\n");
+    }
+    return;
+}
 #endif
