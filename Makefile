@@ -23,10 +23,12 @@ TRACE_AR = @echo "	AR	" $@
 OBJPATH += ./obj
 SRCPATH += ./src
 LIBPATH += $(PREFIX)/lib
-BINPATH += $(PREFIX)/bin
+BINPATH += $(PREFIX)
+HEADPATH += ./include
 
 SRCFILE += $(wildcard $(SRCPATH)/*.cpp)
 SRCFILE += $(wildcard $(SRCPATH)/*.c)
+HEADFILE += $(wildcard $(HEADPATH)/*)
 
 OBJFILE += $(addprefix $(OBJPATH)/,$(filter %.o,$(patsubst %.c,%.o,$(notdir $(SRCFILE)))))
 OBJFILE += $(addprefix $(OBJPATH)/,$(filter %.o,$(patsubst %.cpp,%.o,$(notdir $(SRCFILE)))))
@@ -43,30 +45,30 @@ LDFLAG += -lstdc++
 
 all:director $(LIBFILE) demo
 
-$(OBJPATH)/%.o:$(SRCPATH)/%.c
+$(OBJPATH)/%.o:$(SRCPATH)/%.c $(HEADFILE)
 	$(TRACE_CC)
-	$(Q)$(CC) $(CFLAG) -c $^ -o $@
+	$(Q)$(CC) $(CFLAG) -c $(filter %.c,$^) -o $@
 
 
-$(OBJPATH)/%.o:$(SRCPATH)/%.cpp
+$(OBJPATH)/%.o:$(SRCPATH)/%.cpp $(HEADFILE)
 	$(TRACE_CCP)
-	$(Q)$(CCP) $(CPPFLAG) -c $^ -o $@
+	$(Q)$(CCP) $(CPPFLAG) -c $(filter %.cpp,$^) -o $@
 
 
-demo:$(OBJFILE)
+$(BINPATH)/demo:$(OBJFILE)
 	@echo Start Building demo....
 	@echo Source file include $(SRCFILE)
 	$(TRACE_LD)
-	$(Q)$(LD) $(LDFLAG) $^ -o $(PRFIX)/$(BINPATH)/$@
+	$(Q)$(LD) $(LDFLAG) $^ -o $@
 #	$(Q)$(STRIP) $@ -o $@.striped
 
 #virtual aim
 .PHONY:clean director
 
 director:
-	@mkdir -p $(OBJPATH) $(PREFIX)/$(LIBPATH) $(PREFIX)/$(BINPATH)
+	@mkdir -p $(OBJPATH) $(LIBPATH) $(BINPATH)
 
 clean:
 #-rm $(OBJPATH)/*.o $(LIBPATH)/*.a $(LIBPATH)/*.so $(BINPATH)/*
-	-rm -rf $(OBJPATH) $(LIBPATH) $(BINPATH)
+	-rm -rf $(OBJPATH) $(LIBPATH) $(BINPATH)/demo
 	

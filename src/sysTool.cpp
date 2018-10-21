@@ -28,13 +28,13 @@ bool Time::freshTime()
 
     memcpy(&info,gmtime(&iTime.tv_sec),sizeof(struct tm));
 
-    sprintf(temp,"%05d%02d%02d-%02d%02d%02d.%03d",info.tm_year+1900,
+    sprintf(temp,"%04d-%02d-%02dT%02d:%02d:%02d.%03d",info.tm_year+1900,
                                                 info.tm_mon,
                                                 info.tm_mday,
                                                 info.tm_hour,
                                                 info.tm_min,
                                                 info.tm_sec,
-                                                iTime.tv_usec);
+                                                iTime.tv_usec/1000);
     //exchange to string
     sTime = temp;
     return true;
@@ -44,13 +44,14 @@ int Time::GetITime()
     freshTime();
     return iTime.tv_sec;
 }
-/*返回为微秒*/
+/*返回为毫秒*/
 unsigned long Time::GetITime(std::string StrTime)
 {
     struct tm info;
     timeval temp;
     memset(&info,0,sizeof(struct tm));
-    sscanf(StrTime.c_str(),"%05d%02d%02d-%02d%02d%02d.%03d",&info.tm_year,
+    //微秒存储毫秒值
+    sscanf(StrTime.c_str(),"%04d-%02d-%02dT%02d:%02d:%02d.%03d",&info.tm_year,
                                                             &info.tm_mon,
                                                             &info.tm_mday,
                                                             &info.tm_hour,
@@ -78,13 +79,13 @@ std::string Time::GetSTime(int iTimeSec)
 
     memcpy(&info,gmtime(&tempStamp.tv_sec),sizeof(struct tm));
 
-    sprintf(ctemp,"%05d%02d%02d-%02d%02d%02d.%03d",info.tm_year+1900,
+    sprintf(ctemp,"%04d-%02d-%02dT%02d:%02d:%02d.%03d",info.tm_year+1900,
                                                 info.tm_mon,
                                                 info.tm_mday,
                                                 info.tm_hour,
                                                 info.tm_min,
                                                 info.tm_sec,
-                                                iTime.tv_usec);
+                                                iTime.tv_usec/1000);
     stemp = ctemp;
     return stemp;
 }

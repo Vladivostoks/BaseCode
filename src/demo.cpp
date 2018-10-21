@@ -63,27 +63,39 @@ int main(int argc,char* argv[])
 
 bool ArrayTestFunc()
 {
-    Array<double> A(3,3,0);
-    Array<double> B(3,1,2);
+    Array<double> A(3,3,3.24);
+
+    double unit[3] = {1.34,2.45,3.155};
+    Array<double> B(1,3,unit,3);
    
     //Test 1 diag Matrix;
     std::cout<<"========Test 1 diag Matrix================"<<std::endl;
-    A.show();
-    A.diag(4);
+    Array<double> G = A;
+    G.show();
+    G.diag(4);
     std::cout<<"===================================="<<std::endl;
-    A.show();
+    G.show();
+
     std::cout<<"========Test 2 T=========================="<<std::endl;
     B.show();
+    //Array<double> D=B[0].V();
+    Array<double> D=B[0];
+    std::cout<<"========Vector 1=================="<<std::endl;
+    D.show();
     B.T(); 
     std::cout<<"===================================="<<std::endl;
     B.show();
+    Array<double> F=B[0].V();
+    //Array<double> F=B[0];
+    std::cout<<"========Vector 1=================="<<std::endl;
+    F.show();
+
     std::cout<<"========Test 3 Dot Multiplication========="<<std::endl;
     Array<double> C=Array<double>::dot(A,B);
-    C.show();
-    std::cout<<"========Test 4 GetVector=================="<<std::endl;
-    Array<double> D=B[1].V();
-    D.show();
-    std::cout<<"========Test 5 Type Change================"<<std::endl;
+    C.show(); 
+
+    /*
+    std::cout<<"========Test 4 Type Change================"<<std::endl;
     Array<int> E(3,3,0);
     A[1][3]=2.452;
     A[2][2]=3.441;
@@ -91,13 +103,16 @@ bool ArrayTestFunc()
     std::cout<<"===================================="<<std::endl;
     E = A;
     E.show();
-    std::cout<<"========Test 6 Value Multiplicaiton======="<<std::endl;
+    */
+
+    std::cout<<"========Test 5 Value Multiplicaiton======="<<std::endl;
     A.show();
     std::cout<<"===================================="<<std::endl;
     A = A*50;
     A.show();
     std::cout<<"===================================="<<std::endl;
-    A = 1/10*A; 
+    A = 1.0/10*A; 
+    A.show();
     std::cout<<"====================END==================="<<std::endl;
     
     

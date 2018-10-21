@@ -33,6 +33,9 @@ class Array{
                 //索引行
                 unsigned int indexline;
                 unsigned int indexrow;
+
+                //using for illigal reply
+                M Empty;
             public:
                 //索引目标起始地址 
                 M* dataAddr;
@@ -41,8 +44,11 @@ class Array{
                                                                              flagT(false),
                                                                              indexline(0),
                                                                              indexrow(0),
+                                                                             Empty(0),
                                                                              dataAddr(addr)
-                {};
+                {
+                   //LOG_INFO(totalline<<"--"<<totalrow);
+                };
                 ~Vector(){};
                 bool reset()
                 {
@@ -67,13 +73,15 @@ class Array{
                 bool setIndexParam(unsigned int line,bool Tflag)
                 {
                     indexline = line;
+                    flagT = Tflag;
                     return true;
                 }
                 M& operator[](unsigned int RowIndex)
                 {
                     if(NULL == dataAddr)
                     {
-                       LOG_ERR("Vector's addr is NULL");
+                        LOG_ERR("Vector's addr is NULL");
+                        return Empty; 
                     }
                     //Vector存向量列索引
                     indexrow = RowIndex;
@@ -87,6 +95,14 @@ class Array{
                     M& ret = *(dataAddr+indexrow+(indexline*totalrow));
                     return ret;
                 }
+                unsigned int getUnitNum() const
+                {
+                    if(flagT)
+                    {
+                        return totalline;
+                    }
+                    return totalrow;
+                }
                 //返回当前行的向量
                 Array<M> V()
                 {
@@ -94,30 +110,27 @@ class Array{
                     {
                         LOG_ERR("Vector's addr is NULL");
                     }
-                    if(false == flagT)
+                    if(flagT)
                     {
                         //返回转至后的行，也就是1*line
                         Array<M> tempArray(1,totalline,0);
                         int i =0; 
                         for(i=0;i<totalline;i++)
                         {
-                           *tempArray[0][i] = *(*this)[i];
+                            //LOG_INFO((*this)[i]);
+                            tempArray[0][i] = (*this)[i];
                         }
                         return tempArray;
                     }
-                    else
-                    { 
-                        //返回行，也就是1*row
-                        Array<M> tempArray(1,totalrow,0);
-                        int i =0; 
-                        for(i=0;i<totalrow;i++)
-                        {
-                           *tempArray[0][i] = *(*this)[i];
-                        }
-                        return tempArray;
+                    //返回行，也就是1*row
+                    Array<M> tempArray(1,totalrow,0);
+                    int i =0; 
+                    for(i=0;i<totalrow;i++)
+                    {
+                        //LOG_INFO((*this)[i]);
+                        tempArray[0][i] = (*this)[i];
                     }
-                    LOG_ERR("No Array V return");
-                    return NULL;
+                    return tempArray;
                 }
         };
                 
@@ -134,20 +147,32 @@ class Array{
         /*apply space size*/
         unsigned long spaceSize;
         
-        unsigned int getLine(){if(flagT){return Row;} return Line;};
-        unsigned int getRow(){if(flagT){return Line;} return Row;};
-    public:
+     public:
         Array(unsigned int line,unsigned int row,M defaultValue);
         ~Array();
+        //get info
+        unsigned int getLine() const {if(flagT){return Row;} return Line;};
+        unsigned int getRow() const {if(flagT){return Line;} return Row;};
+        //M* getAddr() const {return address;};
+        //unsigned long getSize() const {return spaceSize;};
+        //bool getflagT() const {return flagT;};
+        //Vector getIndex() const {return Index;};
+   
         //copy function
         Array(const Array<M>& A);
+        //change function
+        Array(Array<M>::Vector& V);
+        //change function
+        Array(unsigned int line,unsigned int row,M Unit[],unsigned int num);
 
         template <class K> Array(const Array<K>& A);
 
         //set value function
         Array<M>& operator=(const Array<M>& A);
+        Array<M>& operator=(const Array<M>::Vector& V);
 
-        template <class K> Array<M>& operator=(const Array<K>& A);
+        //暂时不实现不同类型转换，暂时没意义且破坏封装性
+        //template <class K> Array<M>& operator=(const Array<K>& A);
 
         Vector& operator[](unsigned int index);
 
@@ -158,7 +183,7 @@ class Array{
         //matrix function
         Array<M>& T();
 
-        static Array<M> dot(const Array<M>& left,const Array<M>& right);
+        static Array<M> dot(Array<M>& left,Array<M>& right);
 
         Array<M>& diag(const M Value);
 
@@ -204,6 +229,43 @@ Array<M>::Array(unsigned int line,unsigned int row,M defaultValue):Line(line),
 }
 
 template <class M>
+Array<M>::Array(unsigned int line,unsigned int row,M Unit[],unsigned int num):Line(line),
+                                                                               Row(row),
+                                                                               flagT(false),
+                                                                               address(NULL),
+                                                                               Index(Line,Row,NULL),
+                                                                               spaceSize(0)
+{
+    //非异常抛出new
+    if(0 != Line*Row)
+    {
+        address = new(std::nothrow) M[Line*Row];
+
+        if(NULL == address)
+        {
+            LOG_ERR("Array alloc sapce failed!!!!");
+        }
+        else
+        {
+            int i=0;
+            Index.dataAddr = address;
+            for(i=0;i<Line*Row;i++)
+            {
+                if(i<num)
+                {
+                    *(address+i) = Unit[i];
+                }
+                else
+                {
+                    *(address+i) = 0;
+                }
+            }
+            spaceSize = sizeof(M)*Line*Row;
+        }
+    }
+}
+
+template <class M>
 Array<M>::~Array()
 {
     if(NULL != address)
@@ -240,7 +302,36 @@ Array<M>::Array(const Array<M>& A):Line(A.Line),
     }
 }
 
+template<class M>
+Array<M>::Array(Array<M>::Vector& V):Line(1),
+                                    Row(V.getUnitNum()),
+                                    flagT(false),
+                                    address(NULL),
+                                    Index(this->Line,this->Row,NULL),
+                                    spaceSize(0)
 
+{   
+    //LOG_INFO("Line : "<<Line<<"Row: "<<Row);
+    //deep copy
+    if(0 != Line*Row)
+    {
+        address = new(std::nothrow) M[Line*Row];
+
+        if(NULL == address)
+        {
+            LOG_ERR("Array alloc sapce failed!!!!");
+        }
+        else
+        {
+            Index.dataAddr = address;
+            spaceSize = sizeof(M)*Line*Row;
+            for(int i=0;i<V.getUnitNum();i++)
+            {
+                (*this)[0][i] = V[i];
+            }
+        }
+    }
+}
 //different type deep copy
 template <class M>
 template <class K> Array<M>::Array(const Array<K>& A):Line(A.Line),
@@ -323,16 +414,27 @@ Array<M>& Array<M>::operator=(const Array<M>& A)
     return *this;
 }
 
+//todo using Vector for Array
+template<class M>
+Array<M>& Array<M>::operator=(const Array<M>::Vector& V)
+{
+    return *this;  
+}
+//暂时不实现不同类型转换，暂时没意义且破坏封装性
+/*
 template <class M>
 template <class K> Array<M>& Array<M>::operator=(const Array<K>& A)
 {
     LOG_WARN("Array = between different type");
     //force apply mem again
-    ~Array();
+    this->~Array();
+
+    Line = A.getLine();
+    Row = A.getRow();
     //apply again & copy
-    if(0 != A.Line*A.Row)
+    if(0 != A.getLine()*A.getRow())
     {
-        address = new(std::nothrow) K[Line*Row];
+        address = reinterpret_cast<M*>(new(std::nothrow) K[Line*Row]);
 
         if(NULL == address)
         {
@@ -341,8 +443,8 @@ template <class K> Array<M>& Array<M>::operator=(const Array<K>& A)
         else
         {
             Index.dataAddr = address;
-            spaceSize = sizeof(K)*A.Line*A.Row;
-            memcpy(address,A.address,A.spaceSize);
+            spaceSize = sizeof(K)*A.getLine()*A.getRow();
+            memcpy(address,A.getAddr(),A.getSize());
         }
     }
     else
@@ -351,17 +453,14 @@ template <class K> Array<M>& Array<M>::operator=(const Array<K>& A)
         spaceSize = 0;
     }
 
- 
-    Line = A.Line;
-    Row = A.Row;
-    flagT = A.flagT;
+    flagT = A.getflagT();
     
     //copy index
-    Index = A.Index;    
+    Index = A.getIndex();
 
     return *this;
 }
-
+*/
 
 template <class M>
 typename Array<M>::Vector& Array<M>::operator[](unsigned int LineIndex)
@@ -374,22 +473,24 @@ template <class M>
 Array<M>& Array<M>::T()
 {
     flagT = !flagT;
+    return *this;
 }
 
 
 template <class M>
-Array<M> Array<M>::dot(const Array<M>& left,const Array<M>& right)
+Array<M> Array<M>::dot(Array<M>& left,Array<M>& right)
 {
     int i = left.getLine();
     int j = right.getRow();
+    Array<M> tempArray(i,j,0);
 
     //矩阵点乘法
     if(left.getRow() != right.getLine())
     {
         LOG_ERR("Array dot illigal,left row is not same with right line");
+        return tempArray;
     }
     //same result
-    Array<M> tempArray(i,j,0);
     for(j=0;j<right.getRow();j++)
     {
         for(i=0;i<left.getLine();i++)
@@ -402,6 +503,7 @@ Array<M> Array<M>::dot(const Array<M>& left,const Array<M>& right)
             }
         }
     }
+    return tempArray;
 }
 
 template <class M>
@@ -416,6 +518,7 @@ Array<M>& Array<M>::diag(const M Value)
     else
     {
         int i=0;
+        memset(address,0,spaceSize);
         for(i=0;i<Line;i++)
         {
             (*this)[i][i] = Value;
@@ -431,7 +534,7 @@ template <class K> Array<M> Array<M>::operator*(K Value)
 {
     int i = 0;
     int j = 0;
-    if(NULL != address)
+    if(NULL == address)
     {
         LOG_ERR("data address is NULL");
     }
@@ -440,7 +543,8 @@ template <class K> Array<M> Array<M>::operator*(K Value)
     {
         for(j=0;j<Row;j++)
         {
-            tempArray[i][j] *= Value;
+            //LOG_INFO((*this)[i][j]<<" * "<< Value);
+            tempArray[i][j] =(*this)[i][j] * Value;
         }
     }
     return tempArray;
@@ -449,6 +553,7 @@ template <class K> Array<M> Array<M>::operator*(K Value)
 template<class K,class J>
 Array<J> operator*(K Value,Array<J>& A)
 {
+    //LOG_INFO(Value);
     return A*Value;    
 }
 
@@ -463,9 +568,9 @@ void Array<M>::show()
         printf("[");
         for(j=0;j<getRow();j++)
         {
-            printf("%f ",(*this)[i][j]);
+            std::cout<<(*this)[i][j]<<" ";
         }
-        printf("]\n");
+        std::cout<<"]"<<std::endl;
     }
     return;
 }
