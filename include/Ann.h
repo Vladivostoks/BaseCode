@@ -52,28 +52,29 @@ Y υ [upsilon] 宇普西龙
 //激活函数和损失函数抽象
 template<class T>
 class BaseFun{
+    public:
         BaseFun(){};
         ~BaseFun(){};
 
         //前向运算
         virtual T front(T value)=0;
-        virtual Array<T> front(Array<T> value)=0;
+        virtual Array<T> front(Array<T>& value)=0;
         //反响传播
         virtual T back(T value)=0;
-        virtual Array<T> back(Array<T> array)=0;
+        virtual Array<T> back(Array<T>& array)=0;
 };
 
 /*tanh激活函数*/
 template<class T>
-class TanhActivator:BaseFun<T>{
+class TanhActivator:public BaseFun<T>{
         TanhActivator(){};
         ~TanhActivator(){};
         //前向运算
         T front(T value); 
-        Array<T> front(Array<T> array);
+        Array<T> front(Array<T>& array);
         //反向传播
         T back(T value);
-        Array<T> back(Array<T> array);
+        Array<T> back(Array<T>& array);
 };
 template<class T>
 T TanhActivator<T>::front(T value){
@@ -81,7 +82,7 @@ T TanhActivator<T>::front(T value){
 }
 
 template<class T>
-Array<T> TanhActivator<T>::front(Array<T> array){
+Array<T> TanhActivator<T>::front(Array<T>& array){
     return 2,0/(1.0 + (-2*array).exp())-1.0;
 }
 
@@ -91,21 +92,22 @@ T TanhActivator<T>::back(T value){
 }
 
 template<class T>
-Array<T> TanhActivator<T>::back(Array<T> array){
+Array<T> TanhActivator<T>::back(Array<T>& array){
     return  (1-array*array); 
 }
 
 /*Sigmoid激活函数*/
 template<class T>
-class SigmoidActivator:BaseFun<T>{
-    SigmoidActivator();
-    ~SigmoidActivator();
-    //前向运算
-    T front(T value);
-    Array<T> front(Array<T> array);
-    //反向传播
-    T back(T value);
-    Array<T> back(Array<T> array);
+class SigmoidActivator:public BaseFun<T>{
+    public:
+        SigmoidActivator(){};
+        ~SigmoidActivator(){};
+        //前向运算
+        T front(T value);
+        Array<T> front(Array<T>& array);
+        //反向传播
+        T back(T value);
+        Array<T> back(Array<T>& array);
 };
 template<class T>
 T SigmoidActivator<T>::front(T value){
@@ -113,7 +115,7 @@ T SigmoidActivator<T>::front(T value){
 }
 
 template<class T>
-Array<T> SigmoidActivator<T>::front(Array<T> array){
+Array<T> SigmoidActivator<T>::front(Array<T>& array){
    return 1.0/(1.0+array.exp()); 
 }
 
@@ -123,23 +125,44 @@ T SigmoidActivator<T>::back(T value){
 }
 
 template <class T>
-Array<T> SigmoidActivator<T>::back(Array<T> array){
+Array<T> SigmoidActivator<T>::back(Array<T>& array){
     return front(array)*(1-front(array));
 }
 
 /*********************************损失函数**********************************/
 /*平方差函数*/
 template<class T>
-class squareLoss:BaseFun<T>{
-        squareLoss(){};
-        ~squareLoss(){};
+class SquareLoss:public BaseFun<T>{
+    public:
+        SquareLoss(){};
+        ~SquareLoss(){};
         //前向运算
         T front(T value); 
-        Array<T> front(Array<T> array);
+        Array<T> front(Array<T>& array);
         //反向传播
         T back(T value);
-        Array<T> back(Array<T> array);
+        Array<T> back(Array<T>& array);
 };
+
+template<class T>
+T SquareLoss<T>::front(T value)
+{
+}
+
+template<class T>
+Array<T> SquareLoss<T>::front(Array<T>& array)
+{
+}
+
+template<class T>
+T SquareLoss<T>::back(T value)
+{
+}
+
+template<class T>
+Array<T> SquareLoss<T>::back(Array<T>& array)
+{
+}
 
 /*********************************基本单元**********************************/
 //基本单元抽象
@@ -184,7 +207,7 @@ class NolinearUnit:public BaseUnit<T>{
         //单元初始化函数
         bool Paraminit(Array<T> value);
     public:
-        NolinearUnit(BaseFun<T> *fun);
+        NolinearUnit(BaseFun<T> *fun,int M=m,int N=n);
         ~NolinearUnit();
 
         //单元流程
@@ -196,19 +219,29 @@ class NolinearUnit:public BaseUnit<T>{
 };
 
 template <class T,int m,int n>
-NolinearUnit<T,m,n>::NolinearUnit(BaseFun<T> *fun):InputSize(m),
-                                                    OutputSize(n),
-                                                    weight(m,n,0),
-                                                    bias(1,n,0),
-                                                    Out(1,n,0),
-                                                    δ(1,n,0),
-                                                    InputValue(m,1,0),
-                                                    Active(fun),
-                                                    BaseUnit<T>::property("NolinearUnit")
+NolinearUnit<T,m,n>::NolinearUnit(BaseFun<T> *fun,int M,int N):InputSize(M),
+                                                            OutputSize(N),
+                                                            weight(M,N,0),
+                                                            bias(1,N,0),
+                                                            Out(1,N,0),
+                                                            δ(1,N,0),
+                                                            InputValue(M,1,0),
+                                                            Active(fun),
+                                                            BaseUnit<T>::property("NolinearUnit")
 {
     //初始化单元权重和状态
     Paraminith(weight);
 }
+
+template <class T,int m,int n>
+NolinearUnit<T,m,n>::~NolinearUnit()
+{
+    if(NULL != Active)
+    {
+        delete Active;
+    }
+}
+
 template <class T,int m,int n>
 bool NolinearUnit<T,m,n>::Paraminit(Array<T> value)
 {

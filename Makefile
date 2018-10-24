@@ -37,7 +37,7 @@ LIBFILE +=
 CFLAG += -Wall -O3
 CFLAG += -I ./include
 
-CPPFLAG += -Wall -O3 
+CPPFLAG += -Wall -O3 -std=c++11
 CPPFLAG += -I ./include
 
 #LDFLAG +=  ${addprfix -l,$(LIBFILE)}

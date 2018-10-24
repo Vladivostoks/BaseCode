@@ -111,8 +111,14 @@ bool ArrayTestFunc()
     A = A*50;
     A.show();
     std::cout<<"===================================="<<std::endl;
-    A = 1.0/10*A; 
+    A = 0.1*A; 
     A.show();
+    A = 4.3123*(A*1.0);
+    A.show();
+    std::cout<<"===================================="<<std::endl;
+    Array<double>H = A.exp();
+    A = 0.1*H; 
+    H.show();
     std::cout<<"====================END==================="<<std::endl;
     
     
@@ -121,6 +127,23 @@ bool ArrayTestFunc()
 
 bool FCLNetTestFunc()
 {
+#if 1
+    FCLNet testNet;
+
+    Array<double> A(0,100,3);
+    testNet.Addlayer(new NolinearUnit<double,100,70>(new SigmoidActivator<double>()));
+
+    testNet.Addlayer(new NolinearUnit<double,70,30>(new SigmoidActivator<double>()));
+    
+    testNet.Addlayer(new NolinearUnit<double,30,10>(new SigmoidActivator<double>()));
+
+    testNet.Addlayer(new NolinearUnit<double,10,5>(new SigmoidActivator<double>()));
+
+    testNet.Addlayer(new NolinearUnit<double,5,2>(new SigmoidActivator<double>()));
+
+
+    testNet.run(A);
+#endif
     return true;
 }
 
