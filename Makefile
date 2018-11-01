@@ -43,6 +43,8 @@ CPPFLAG += -I ./include
 #LDFLAG +=  ${addprfix -l,$(LIBFILE)}
 LDFLAG += -lstdc++
 
+
+$(info Start Building demo....)
 all:director $(LIBFILE) demo
 
 $(OBJPATH)/%.o:$(SRCPATH)/%.c $(HEADFILE)
@@ -56,7 +58,6 @@ $(OBJPATH)/%.o:$(SRCPATH)/%.cpp $(HEADFILE)
 
 
 $(BINPATH)/demo:$(OBJFILE)
-	@echo Start Building demo....
 	@echo Source file include $(SRCFILE)
 	$(TRACE_LD)
 	$(Q)$(LD) $(LDFLAG) $^ -o $@

@@ -54,7 +54,7 @@ template<class T>
 class BaseFun{
     public:
         BaseFun(){};
-        ~BaseFun(){};
+        virtual ~BaseFun(){};
 
         //前向运算
         virtual T front(T value)=0;
@@ -126,7 +126,12 @@ T SigmoidActivator<T>::back(T value){
 
 template <class T>
 Array<T> SigmoidActivator<T>::back(Array<T>& array){
-    return front(array)*(1-front(array));
+    Array<T>A= front(array);
+    //#TODO
+    //Array<T>B= (1-front(array));
+    //return A*B;
+    return A;
+    //return front(array)*(1-front(array));
 }
 
 /*********************************损失函数**********************************/
@@ -173,6 +178,7 @@ class BaseUnit{
         std::string property;
     public:
         BaseUnit(){};
+        BaseUnit(const char* name):property(name){};
         virtual ~BaseUnit(){};
         //方法
         virtual unsigned int GOutSize()=0;
@@ -205,7 +211,7 @@ class NolinearUnit:public BaseUnit<T>{
         //单元激活函数
         BaseFun<T> *Active;
         //单元初始化函数
-        bool Paraminit(Array<T> value);
+        bool ParamInit(Array<T> value);
     public:
         NolinearUnit(BaseFun<T> *fun,int M=m,int N=n);
         ~NolinearUnit();
@@ -219,18 +225,18 @@ class NolinearUnit:public BaseUnit<T>{
 };
 
 template <class T,int m,int n>
-NolinearUnit<T,m,n>::NolinearUnit(BaseFun<T> *fun,int M,int N):InputSize(M),
+NolinearUnit<T,m,n>::NolinearUnit(BaseFun<T> *fun,int M,int N):BaseUnit<T>("NolinearUnit"),
+                                                            InputSize(M),
                                                             OutputSize(N),
                                                             weight(M,N,0),
                                                             bias(1,N,0),
                                                             Out(1,N,0),
                                                             δ(1,N,0),
                                                             InputValue(M,1,0),
-                                                            Active(fun),
-                                                            BaseUnit<T>::property("NolinearUnit")
+                                                            Active(fun)
 {
     //初始化单元权重和状态
-    Paraminith(weight);
+    ParamInit(weight);
 }
 
 template <class T,int m,int n>
@@ -242,8 +248,9 @@ NolinearUnit<T,m,n>::~NolinearUnit()
     }
 }
 
+//#TODO
 template <class T,int m,int n>
-bool NolinearUnit<T,m,n>::Paraminit(Array<T> value)
+bool NolinearUnit<T,m,n>::ParamInit(Array<T> value)
 {
     return true;
 }
@@ -255,7 +262,7 @@ Array<T> NolinearUnit<T,m,n>::UnitFront(const Array<T> input)
     //记录输入值
     InputValue = input;
     //输入进行矩阵运算
-    Array<T> result = Array<T>::dot(weight.T()).T()+bias;
+    Array<T> result = Array<T>::dot(weight.T(),InputValue).T()+bias;
     return Active->front(result);
 }
 

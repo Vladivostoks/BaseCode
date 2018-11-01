@@ -79,7 +79,7 @@ bool ArrayTestFunc()
     std::cout<<"========Test 2 T=========================="<<std::endl;
     B.show();
     //Array<double> D=B[0].V();
-    Array<double> D=B[0];
+    Array<double> D=A[0];
     std::cout<<"========Vector 1=================="<<std::endl;
     D.show();
     B.T(); 

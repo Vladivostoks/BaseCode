@@ -153,7 +153,7 @@ class Array{
         //get info
         unsigned int getLine() const {if(flagT){return Row;} return Line;};
         unsigned int getRow() const {if(flagT){return Line;} return Row;};
-        //M* getAddr() const {return address;};
+        //const M* getAddr const {return address;};
         //unsigned long getSize() const {return spaceSize;};
         //bool getflagT() const {return flagT;};
         //Vector getIndex() const {return Index;};
@@ -178,28 +178,32 @@ class Array{
 
         //matrix function
         template <class K> Array<M> operator*(K Value);
+        template<class K> Array<M> operator*(Array<K>&& Value);
+        template<class K> Array<M> operator*(Array<K>& Value);
         //rValue quote reuse
         template<class K,class J> friend Array<J> operator*(const K Value,Array<J>& A);
         //rValue quote reuse
         template<class K,class J> friend Array<J> operator*(const K Value,Array<J>&& A);
 
-        template <class K> Array<M> operator+(K Value);
+        template<class K> Array<M> operator+(K Value);
+        template<class K> Array<M> operator+(Array<K>&& Value);
+        template<class K> Array<M> operator+(Array<K>& Value);
         template<class K,class J> friend Array<J> operator+(K Value,Array<J>& A);
         template<class K,class J> friend Array<J> operator+(K Value,Array<J>&& A);
-        
+            
         template <class K> Array<M> operator-(K Value);
+        template<class K> Array<M> operator-(Array<K>&& Value);
+        template<class K> Array<M> operator-(Array<K>& Value);
         template<class K,class J> friend Array<J> operator-(K Value,Array<J>& A);
         template<class K,class J> friend Array<J> operator-(K Value,Array<J>&& A);
 
         template <class K> Array<M> operator/(K Value);
+        template<class K> Array<M> operator/(Array<K>&& Value);
+        template<class K> Array<M> operator/(Array<K>& Value);
         template<class K,class J> friend Array<J> operator/(K Value,Array<J>& A);
         template<class K,class J> friend Array<J> operator/(K Value,Array<J>&& A);
 
         template <class K> Array<M> operator-();
-        template<class K,class J> friend Array<J> operator*(Array<K>& Value,Array<J>& A);
-        template<class K,class J> friend Array<J> operator*(Array<K>&& Value,Array<J>& A);
-        template<class K,class J> friend Array<J> operator*(Array<K>& Value,Array<J>&& A);
-        template<class K,class J> friend Array<J> operator*(Array<K>&& Value,Array<J>&& A);
         Array<M> exp();
         Array<M>& T();
 
@@ -433,12 +437,53 @@ Array<M>& Array<M>::operator=(const Array<M>& A)
     return *this;
 }
 
-//todo using Vector for Array
+//using Vector for Array
 template<class M>
 Array<M>& Array<M>::operator=(const Array<M>::Vector& V)
 {
-    return *this;  
+    //if size is diff ,delete space and apply again
+    Array<M> A = V.V();
+    if(spaceSize != A.spaceSize)
+    {
+        this->~Array();
+        //apply again & copy
+        if(0 != A.Line*A.Row)
+        {
+            address = new(std::nothrow) M[Line*Row];
+
+            if(NULL == address)
+            {
+                LOG_ERR("Array alloc sapce failed!!!!");
+            }
+            else
+            {
+                Index.dataAddr = address;
+                spaceSize = sizeof(M)*A.Line*A.Row;
+                memcpy(address,A.address,A.spaceSize);
+            }
+        }
+        else
+        {
+            Index.dataAddr = NULL;
+            spaceSize = 0;
+        }
+    }
+    else
+    {
+        //just copy 
+        memcpy(address,A.address,A.spaceSize);
+    }
+    
+    Line = A.Line;
+    Row = A.Row;
+    flagT = A.flagT;
+    
+    //copy index
+    Index = A.Index;    
+
+    return *this;
 }
+
 //暂时不实现不同类型转换，暂时没意义且破坏封装性
 /*
 template <class M>
@@ -463,7 +508,7 @@ template <class K> Array<M>& Array<M>::operator=(const Array<K>& A)
         {
             Index.dataAddr = address;
             spaceSize = sizeof(K)*A.getLine()*A.getRow();
-            memcpy(address,A.getAddr(),A.getSize());
+            memcpy(address,A.address,A.getSize());
         }
     }
     else
@@ -569,6 +614,59 @@ template <class K> Array<M> Array<M>::operator*(const K Value)
     return tempArray;
 }
 
+template<class M> 
+template<class K> Array<M> Array<M>::operator*(Array<K>&& Value)
+{
+    int i = 0;
+    int j = 0;
+
+    if(NULL == Value.address||Value.getRow() != getRow() || Value.getLine() != getLine())
+    {
+        LOG_ERR("data address is NULL or input not with same row&line");
+        Array<M> tempArray(0,0);
+        return tempArray;
+    }
+
+    Array<M> tempArray(getLine(),getRow(),0);
+
+    for(i=0;i<getLine();i++)
+    {
+        for(j=0;j<getRow();j++)
+        {
+            //LOG_INFO((*this)[i][j]<<" * "<< Value);
+            tempArray[i][j] =Value[i][j]*(*this)[i][j];
+        }
+    }
+    return tempArray;
+}
+
+template<class M> 
+template<class K> Array<M> Array<M>::operator*(Array<K>& Value)
+{
+    int i = 0;
+    int j = 0;
+
+    if(NULL == Value.address||Value.getRow() != getRow() || Value.getLine() != getLine())
+    {
+        LOG_ERR("data address is NULL or input not with same row&line");
+        Array<M> tempArray(0,0);
+        return tempArray;
+    }
+
+    Array<M> tempArray(getLine(),getRow(),0);
+
+    for(i=0;i<getLine();i++)
+    {
+        for(j=0;j<getRow();j++)
+        {
+            //LOG_INFO((*this)[i][j]<<" * "<< Value);
+            tempArray[i][j] =Value[i][j]*(*this)[i][j];
+        }
+    }
+    return tempArray;
+}
+
+
 template<class K,class J>
 Array<J> operator*(const K Value,Array<J>&& A)
 {
@@ -607,6 +705,58 @@ template <class K> Array<M> Array<M>::operator+(K Value)
         {
             //LOG_INFO((*this)[i][j]<<" * "<< Value);
             tempArray[i][j] =(*this)[i][j] + Value;
+        }
+    }
+    return tempArray;
+}
+
+template<class M> 
+template<class K> Array<M> Array<M>::operator+(Array<K>&& Value)
+{
+    int i = 0;
+    int j = 0;
+
+    if(NULL == Value.address||Value.getRow() != getRow() || Value.getLine() != getLine())
+    {
+        LOG_ERR("data address is NULL or input not with same row&line");
+        Array<M> tempArray(0,0);
+        return tempArray;
+    }
+
+    Array<M> tempArray(getLine(),getRow(),0);
+
+    for(i=0;i<getLine();i++)
+    {
+        for(j=0;j<getRow();j++)
+        {
+            //LOG_INFO((*this)[i][j]<<" * "<< Value);
+            tempArray[i][j] =Value[i][j]+(*this)[i][j];
+        }
+    }
+    return tempArray;
+}
+
+template<class M> 
+template<class K> Array<M> Array<M>::operator+(Array<K>& Value)
+{
+    int i = 0;
+    int j = 0;
+
+    if(NULL == Value.address||Value.getRow() != getRow() || Value.getLine() != getLine())
+    {
+        LOG_ERR("data address is NULL or input not with same row&line");
+        Array<M> tempArray(0,0);
+        return tempArray;
+    }
+
+    Array<M> tempArray(getLine(),getRow(),0);
+
+    for(i=0;i<getLine();i++)
+    {
+        for(j=0;j<getRow();j++)
+        {
+            //LOG_INFO((*this)[i][j]<<" * "<< Value);
+            tempArray[i][j] =Value[i][j]+(*this)[i][j];
         }
     }
     return tempArray;
@@ -666,6 +816,60 @@ Array<J> operator-(const K Value,Array<J>& A)
     return tempArray;
 }
 
+template<class M> 
+template<class K> Array<M> Array<M>::operator-(Array<K>&& Value)
+{
+    int i = 0;
+    int j = 0;
+
+    if(NULL == Value.address||Value.getRow() != getRow() || Value.getLine() != getLine())
+    {
+        LOG_ERR("data address is NULL or input not with same row&line");
+        Array<M> tempArray(0,0);
+        return tempArray;
+    }
+
+    Array<M> tempArray(getLine(),getRow(),0);
+
+    for(i=0;i<getLine();i++)
+    {
+        for(j=0;j<getRow();j++)
+        {
+            //LOG_INFO((*this)[i][j]<<" * "<< Value);
+            tempArray[i][j] =Value[i][j]-(*this)[i][j];
+        }
+    }
+    return tempArray;
+}
+
+template<class M> 
+template<class K> Array<M> Array<M>::operator-(Array<K>& Value)
+{
+    int i = 0;
+    int j = 0;
+
+    if(NULL == Value.address||Value.getRow() != getRow() || Value.getLine() != getLine())
+    {
+        LOG_ERR("data address is NULL or input not with same row&line");
+        Array<M> tempArray(0,0);
+        return tempArray;
+    }
+
+    Array<M> tempArray(getLine(),getRow(),0);
+
+    for(i=0;i<getLine();i++)
+    {
+        for(j=0;j<getRow();j++)
+        {
+            //LOG_INFO((*this)[i][j]<<" * "<< Value);
+            tempArray[i][j] =Value[i][j]-(*this)[i][j];
+        }
+    }
+    return tempArray;
+}
+
+
+
 template<class K,class J>
 Array<J> operator-(const K Value,Array<J>&& A)
 {
@@ -708,6 +912,73 @@ template <class K> Array<M> Array<M>::operator/(K Value)
     return tempArray;
 }
 
+template<class M> 
+template<class K> Array<M> Array<M>::operator/(Array<K>&& Value)
+{
+    int i = 0;
+    int j = 0;
+
+    if(NULL == Value.address||Value.getRow() != getRow() || Value.getLine() != getLine())
+    {
+        LOG_ERR("data address is NULL or input not with same row&line");
+        Array<M> tempArray(0,0);
+        return tempArray;
+    }
+
+    Array<M> tempArray(getLine(),getRow(),0);
+
+    for(i=0;i<getLine();i++)
+    {
+        for(j=0;j<getRow();j++)
+        {
+            //LOG_INFO((*this)[i][j]<<" * "<< Value);
+             if(0 != (*this)[i][j])
+            {
+                tempArray[i][j] =Value[i][j]/(*this)[i][j];
+            }
+            else
+            {
+                tempArray[i][j] = 0;
+            }
+        }
+    }
+    return tempArray;
+}
+
+template<class M> 
+template<class K> Array<M> Array<M>::operator/(Array<K>& Value)
+{
+    int i = 0;
+    int j = 0;
+
+    if(NULL == Value.address||Value.getRow() != getRow() || Value.getLine() != getLine())
+    {
+        LOG_ERR("data address is NULL or input not with same row&line");
+        Array<M> tempArray(0,0);
+        return tempArray;
+    }
+
+    Array<M> tempArray(getLine(),getRow(),0);
+
+    for(i=0;i<getLine();i++)
+    {
+        for(j=0;j<getRow();j++)
+        {
+            //LOG_INFO((*this)[i][j]<<" * "<< Value);
+            if(0 != (*this)[i][j])
+            {
+                tempArray[i][j] =Value[i][j]/(*this)[i][j];
+            }
+            else
+            {
+                tempArray[i][j] = 0;
+            }
+        }
+    }
+    return tempArray;
+}
+
+
 template<class K,class J>
 Array<J> operator/(const K Value,Array<J>& A)
 {
@@ -745,40 +1016,6 @@ Array<J> operator/(const K Value,Array<J>&& A)
         {
             //LOG_INFO((*this)[i][j]<<" * "<< Value);
             tempArray[i][j] =Value/A[i][j];
-        }
-    }
-    return tempArray;
-}
-
-template<class K,class J> Array<J> operator*(Array<K>& Value,Array<J>& A)
-{
-    return std::move(Value)*std::move(A);
-}
-template<class K,class J> Array<J> operator*(Array<K>&& Value,Array<J>& A)
-{
-    return Value*std::move(A);
-}
-template<class K,class J> Array<J> operator*(Array<K>& Value,Array<J>&& A)
-{
-    return std::move(Value)*A;
-}
-template<class K,class J> Array<J> operator*(Array<K>&& Value,Array<J>&& A)
-{
-    int i = 0;
-    int j = 0;
-    if(NULL == A.address || NULL == Value.address||Value.getRow() != A.getRow() || Value.getLine() != A.getLine())
-    {
-        LOG_ERR("data address is NULL or input not with same row&line");
-        Array<J> tempArray(0,0);
-        return tempArray;
-    }
-    Array<J> tempArray(A.getLine(),A.getRow(),0);
-    for(i=0;i<A.getLine();i++)
-    {
-        for(j=0;j<A.getRow();j++)
-        {
-            //LOG_INFO((*this)[i][j]<<" * "<< Value);
-            tempArray[i][j] =Value[i][j]*A[i][j];
         }
     }
     return tempArray;
