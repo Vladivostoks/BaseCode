@@ -206,7 +206,7 @@ class Array{
         template <class K> Array<M> operator-();
         Array<M> exp();
         Array<M>& T();
-
+        Array<M>& random(M min,M max);
         static Array<M> dot(Array<M>& left,Array<M>& right);
 
         Array<M>& diag(const M Value);
@@ -540,6 +540,18 @@ Array<M>& Array<M>::T()
     return *this;
 }
 
+template <class M>
+Array<M>& Array<M>::random(M min,M max)
+{
+    for(int i=0;i<getLine();i++)
+    {
+        for(int j=0;j<getRow();j++)
+        {
+            (*this)[i][j]=((double)rand()/RAND_MAX)*(max-min) + min;
+        }
+    }
+    return *this;
+}
 
 template <class M>
 Array<M> Array<M>::dot(Array<M>& left,Array<M>& right)

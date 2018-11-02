@@ -126,12 +126,7 @@ T SigmoidActivator<T>::back(T value){
 
 template <class T>
 Array<T> SigmoidActivator<T>::back(Array<T>& array){
-    Array<T>A= front(array);
-    //#TODO
-    //Array<T>B= (1-front(array));
-    //return A*B;
-    return A;
-    //return front(array)*(1-front(array));
+    return front(array)*(1-front(array));
 }
 
 /*********************************损失函数**********************************/
@@ -211,7 +206,7 @@ class NolinearUnit:public BaseUnit<T>{
         //单元激活函数
         BaseFun<T> *Active;
         //单元初始化函数
-        bool ParamInit(Array<T> value);
+        bool ParamInit(Array<T>& value);
     public:
         NolinearUnit(BaseFun<T> *fun,int M=m,int N=n);
         ~NolinearUnit();
@@ -248,10 +243,12 @@ NolinearUnit<T,m,n>::~NolinearUnit()
     }
 }
 
-//#TODO
+//#TODO 确认矩阵初始化的值
 template <class T,int m,int n>
-bool NolinearUnit<T,m,n>::ParamInit(Array<T> value)
+bool NolinearUnit<T,m,n>::ParamInit(Array<T>& value)
 {
+    //矩阵随机初始化,先随便定个范围
+    value.random(-15,15);
     return true;
 }
 

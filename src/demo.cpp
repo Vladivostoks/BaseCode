@@ -121,7 +121,9 @@ bool ArrayTestFunc()
     H.show();
     std::cout<<"====================END==================="<<std::endl;
     
-    
+    std::cout<<"========Test 6 overload model function  Test======="<<std::endl;
+    Array<double> I = (1-H)*(H-1); 
+    std::cout<<"====================END==================="<<std::endl;
     return true;
 }
 
