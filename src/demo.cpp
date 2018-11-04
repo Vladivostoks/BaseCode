@@ -122,7 +122,9 @@ bool ArrayTestFunc()
     std::cout<<"====================END==================="<<std::endl;
     
     std::cout<<"========Test 6 overload model function  Test======="<<std::endl;
+    //is using  Array<M> Array<M>::operator*(Array<K>&& Value)
     Array<double> I = (1-H)*(H-1); 
+    I.show();
     std::cout<<"====================END==================="<<std::endl;
     return true;
 }
@@ -132,19 +134,20 @@ bool FCLNetTestFunc()
 #if 1
     FCLNet testNet;
 
-    Array<double> A(0,100,3);
-    testNet.Addlayer(new NolinearUnit<double,100,70>(new SigmoidActivator<double>()));
-
-    testNet.Addlayer(new NolinearUnit<double,70,30>(new SigmoidActivator<double>()));
-    
-    testNet.Addlayer(new NolinearUnit<double,30,10>(new SigmoidActivator<double>()));
+    Array<double> A(10,1);
+    A.random(-15,15);
+    std::cout<<"=================INPUT==================="<<std::endl;
+    A.show();
 
     testNet.Addlayer(new NolinearUnit<double,10,5>(new SigmoidActivator<double>()));
 
     testNet.Addlayer(new NolinearUnit<double,5,2>(new SigmoidActivator<double>()));
 
 
-    testNet.run(A);
+    std::cout<<"==================RESULT=================="<<std::endl;
+    testNet.run(A).show();
+    std::cout<<"=================TRAIN==================="<<std::endl;
+
 #endif
     return true;
 }

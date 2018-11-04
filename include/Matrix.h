@@ -135,7 +135,7 @@ class Array{
         };
                 
     private:
-        /*static line&row*/
+        /*static line&row can not using straight*/
         unsigned int Line;
         unsigned int Row;
         /*T flag*/
@@ -563,7 +563,7 @@ Array<M> Array<M>::dot(Array<M>& left,Array<M>& right)
     //矩阵点乘法
     if(left.getRow() != right.getLine())
     {
-        LOG_ERR("Array dot illigal,left row is not same with right line");
+        LOG_ERR("Array dot illigal,left row["<<left.getRow()<<"] is not same with right line["<<right.getLine()<<"]");
         return tempArray;
     }
     //same result
@@ -614,7 +614,7 @@ template <class K> Array<M> Array<M>::operator*(const K Value)
     {
         LOG_ERR("data address is NULL");
     }
-    Array<M> tempArray(Line,Row,0);
+    Array<M> tempArray(getLine(),getRow(),0);
     for(i=0;i<Line;i++)
     {
         for(j=0;j<Row;j++)
@@ -710,7 +710,7 @@ template <class K> Array<M> Array<M>::operator+(K Value)
     {
         LOG_ERR("data address is NULL");
     }
-    Array<M> tempArray(Line,Row,0);
+    Array<M> tempArray(getLine(),getRow(),0);
     for(i=0;i<Line;i++)
     {
         for(j=0;j<Row;j++)
@@ -795,7 +795,7 @@ template <class K> Array<M> Array<M>::operator-(K Value)
     {
         LOG_ERR("data address is NULL");
     }
-    Array<M> tempArray(Line,Row,0);
+    Array<M> tempArray(getLine(),getRow(),0);
     for(i=0;i<Line;i++)
     {
         for(j=0;j<Row;j++)
@@ -912,7 +912,7 @@ template <class K> Array<M> Array<M>::operator/(K Value)
     {
         LOG_ERR("data address is NULL");
     }
-    Array<M> tempArray(Line,Row,0);
+    Array<M> tempArray(getLine(),getRow(),0);
     for(i=0;i<Line;i++)
     {
         for(j=0;j<Row;j++)
@@ -1042,7 +1042,7 @@ template <class K> Array<M> Array<M>::operator-()
     {
         LOG_ERR("data address is NULL");
     }
-    Array<M> tempArray(Line,Row,0);
+    Array<M> tempArray(getLine(),getRow(),0);
     for(i=0;i<Line;i++)
     {
         for(j=0;j<Row;j++)
@@ -1063,7 +1063,7 @@ Array<M> Array<M>::exp()
     {
         LOG_ERR("data address is NULL");
     }
-    Array<M> tempArray(Line,Row,0);
+    Array<M> tempArray(getLine(),getRow(),0);
     for(i=0;i<Line;i++)
     {
         for(j=0;j<Row;j++)
