@@ -34,10 +34,10 @@ OBJFILE += $(addprefix $(OBJPATH)/,$(filter %.o,$(patsubst %.c,%.o,$(notdir $(SR
 OBJFILE += $(addprefix $(OBJPATH)/,$(filter %.o,$(patsubst %.cpp,%.o,$(notdir $(SRCFILE)))))
 
 LIBFILE += 
-CFLAG += -Wall -O3
+CFLAG += -Wall -O2
 CFLAG += -I ./include
 
-CPPFLAG += -Wall -O3 -std=c++11
+CPPFLAG += -Wall -O2 -std=c++11
 CPPFLAG += -I ./include
 
 #LDFLAG +=  ${addprfix -l,$(LIBFILE)}

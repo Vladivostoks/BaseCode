@@ -191,7 +191,7 @@ class Array{
         template<class K,class J> friend Array<J> operator+(K Value,Array<J>& A);
         template<class K,class J> friend Array<J> operator+(K Value,Array<J>&& A);
             
-        template <class K> Array<M> operator-(K Value);
+        template<class K> Array<M> operator-(K Value);
         template<class K> Array<M> operator-(Array<K>&& Value);
         template<class K> Array<M> operator-(Array<K>& Value);
         template<class K,class J> friend Array<J> operator-(K Value,Array<J>& A);
@@ -203,8 +203,9 @@ class Array{
         template<class K,class J> friend Array<J> operator/(K Value,Array<J>& A);
         template<class K,class J> friend Array<J> operator/(K Value,Array<J>&& A);
 
-        template <class K> Array<M> operator-();
+        Array<M> operator-();
         Array<M> exp();
+        M squareSum();
         Array<M>& T();
         Array<M>& random(M min,M max);
         static Array<M> dot(Array<M>& left,Array<M>& right);
@@ -293,6 +294,11 @@ Array<M>::~Array()
 {
     if(NULL != address)
     {
+#if 0
+        char addr[32];
+        sprintf(addr,"%p",this);
+        LOG_INFO("delete Array "<<addr<<" with Line["<<getLine()<<"]Row["<<getRow()<<"]Size["<<spaceSize<<"]");
+#endif
         delete[] address;
         address = NULL;
     }
@@ -402,8 +408,7 @@ Array<M>& Array<M>::operator=(const Array<M>& A)
         //apply again & copy
         if(0 != A.Line*A.Row)
         {
-            address = new(std::nothrow) M[Line*Row];
-
+            address = new(std::nothrow) M[A.Line*A.Row];
             if(NULL == address)
             {
                 LOG_ERR("Array alloc sapce failed!!!!");
@@ -449,8 +454,7 @@ Array<M>& Array<M>::operator=(const Array<M>::Vector& V)
         //apply again & copy
         if(0 != A.Line*A.Row)
         {
-            address = new(std::nothrow) M[Line*Row];
-
+            address = new(std::nothrow) M[A.Line*A.Row];
             if(NULL == address)
             {
                 LOG_ERR("Array alloc sapce failed!!!!");
@@ -586,7 +590,7 @@ template <class M>
 Array<M>& Array<M>::diag(const M Value)
 {
     //矩阵对角化
-    if(Line != Row)
+    if(getLine() != getRow())
     {
        LOG_ERR("Array is not a square matrix!");
        return *this;
@@ -595,7 +599,7 @@ Array<M>& Array<M>::diag(const M Value)
     {
         int i=0;
         memset(address,0,spaceSize);
-        for(i=0;i<Line;i++)
+        for(i=0;i<getLine();i++)
         {
             (*this)[i][i] = Value;
         }
@@ -615,9 +619,9 @@ template <class K> Array<M> Array<M>::operator*(const K Value)
         LOG_ERR("data address is NULL");
     }
     Array<M> tempArray(getLine(),getRow(),0);
-    for(i=0;i<Line;i++)
+    for(i=0;i<getLine();i++)
     {
-        for(j=0;j<Row;j++)
+        for(j=0;j<getRow();j++)
         {
             //LOG_INFO((*this)[i][j]<<" * "<< Value);
             tempArray[i][j] =(*this)[i][j] * Value;
@@ -711,9 +715,9 @@ template <class K> Array<M> Array<M>::operator+(K Value)
         LOG_ERR("data address is NULL");
     }
     Array<M> tempArray(getLine(),getRow(),0);
-    for(i=0;i<Line;i++)
+    for(i=0;i<getLine();i++)
     {
-        for(j=0;j<Row;j++)
+        for(j=0;j<getRow();j++)
         {
             //LOG_INFO((*this)[i][j]<<" * "<< Value);
             tempArray[i][j] =(*this)[i][j] + Value;
@@ -796,9 +800,9 @@ template <class K> Array<M> Array<M>::operator-(K Value)
         LOG_ERR("data address is NULL");
     }
     Array<M> tempArray(getLine(),getRow(),0);
-    for(i=0;i<Line;i++)
+    for(i=0;i<getLine();i++)
     {
-        for(j=0;j<Row;j++)
+        for(j=0;j<getRow();j++)
         {
             //LOG_INFO((*this)[i][j]<<" * "<< Value);
             tempArray[i][j] =(*this)[i][j] - Value;
@@ -913,9 +917,9 @@ template <class K> Array<M> Array<M>::operator/(K Value)
         LOG_ERR("data address is NULL");
     }
     Array<M> tempArray(getLine(),getRow(),0);
-    for(i=0;i<Line;i++)
+    for(i=0;i<getLine();i++)
     {
-        for(j=0;j<Row;j++)
+        for(j=0;j<getRow();j++)
         {
             //LOG_INFO((*this)[i][j]<<" * "<< Value);
             tempArray[i][j] =(*this)[i][j] / Value;
@@ -943,13 +947,13 @@ template<class K> Array<M> Array<M>::operator/(Array<K>&& Value)
     {
         for(j=0;j<getRow();j++)
         {
-            //LOG_INFO((*this)[i][j]<<" * "<< Value);
              if(0 != (*this)[i][j])
             {
                 tempArray[i][j] =Value[i][j]/(*this)[i][j];
             }
             else
             {
+                LOG_ERR("right Array 0 found ["<<i<<"]["<<j<<"]");
                 tempArray[i][j] = 0;
             }
         }
@@ -976,13 +980,13 @@ template<class K> Array<M> Array<M>::operator/(Array<K>& Value)
     {
         for(j=0;j<getRow();j++)
         {
-            //LOG_INFO((*this)[i][j]<<" * "<< Value);
             if(0 != (*this)[i][j])
             {
                 tempArray[i][j] =Value[i][j]/(*this)[i][j];
             }
             else
             {
+                LOG_ERR("right Array 0 found ["<<i<<"]["<<j<<"]");
                 tempArray[i][j] = 0;
             }
         }
@@ -1005,8 +1009,15 @@ Array<J> operator/(const K Value,Array<J>& A)
     {
         for(j=0;j<A.getRow();j++)
         {
-            //LOG_INFO((*this)[i][j]<<" * "<< Value);
-            tempArray[i][j] =Value/A[i][j];
+            if(0 != A[i][j])
+            {
+                tempArray[i][j] =Value/A[i][j];
+            }
+            else
+            {
+                LOG_ERR("right Array 0 found ["<<i<<"]["<<j<<"]");
+                tempArray[i][j] = 0;
+            }
         }
     }
     return tempArray;
@@ -1026,15 +1037,22 @@ Array<J> operator/(const K Value,Array<J>&& A)
     {
         for(j=0;j<A.getRow();j++)
         {
-            //LOG_INFO((*this)[i][j]<<" * "<< Value);
-            tempArray[i][j] =Value/A[i][j];
+            if(0 != A[i][j])
+            {
+                tempArray[i][j] =Value/A[i][j];
+            }
+            else
+            {
+                LOG_ERR("right Array 0 found ["<<i<<"]["<<j<<"]");
+                tempArray[i][j] = 0;
+            }
         }
     }
     return tempArray;
 }
 
 template <class M>
-template <class K> Array<M> Array<M>::operator-()
+Array<M> Array<M>::operator-()
 {
     int i = 0;
     int j = 0;
@@ -1043,11 +1061,10 @@ template <class K> Array<M> Array<M>::operator-()
         LOG_ERR("data address is NULL");
     }
     Array<M> tempArray(getLine(),getRow(),0);
-    for(i=0;i<Line;i++)
+    for(i=0;i<getLine();i++)
     {
-        for(j=0;j<Row;j++)
+        for(j=0;j<getRow();j++)
         {
-            //LOG_INFO((*this)[i][j]<<" * "<< Value);
             tempArray[i][j] =-(*this)[i][j];
         }
     }
@@ -1064,15 +1081,35 @@ Array<M> Array<M>::exp()
         LOG_ERR("data address is NULL");
     }
     Array<M> tempArray(getLine(),getRow(),0);
-    for(i=0;i<Line;i++)
+    for(i=0;i<getLine();i++)
     {
-        for(j=0;j<Row;j++)
+        for(j=0;j<getRow();j++)
         {
             //LOG_INFO((*this)[i][j]<<" exp "<< Value);
             tempArray[i][j] =std::exp((*this)[i][j]);
         }
     }
     return tempArray;
+}
+
+template<class M>
+M Array<M>::squareSum()
+{
+    M sum = 0;
+    if(NULL == address)
+    {
+        LOG_ERR("data address is NULL");
+    }
+    Array<M> tempArray(getLine(),getRow(),0);
+    for(int i=0;i<getLine();i++)
+    {
+        for(int j=0;j<getRow();j++)
+        {
+            //LOG_INFO((*this)[i][j]<<" exp "<< Value);
+            sum += (*this)[i][j]*(*this)[i][j];
+        }
+    }
+    return sum;
 }
 
 template<class M>

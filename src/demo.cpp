@@ -126,28 +126,39 @@ bool ArrayTestFunc()
     Array<double> I = (1-H)*(H-1); 
     I.show();
     std::cout<<"====================END==================="<<std::endl;
+    std::cout<<"========Test 7 assigment function  Test======="<<std::endl;
+    Array<double> J(3,2,1.5);
+    //Array<double> K(4,6,12);
+    //Array<double> L(4,6,12);
+    for(int i =0;i<12;i++)
+    {
+        Array<double> T(i+2,i+4,2.5);
+        J = T;
+        std::cout<<"===================================="<<std::endl;
+    }
+    std::cout<<"====================END==================="<<std::endl;
     return true;
 }
 
 bool FCLNetTestFunc()
 {
 #if 1
-    FCLNet testNet;
+    FCLNet<double> testNet;
 
     Array<double> A(10,1);
     A.random(-15,15);
     std::cout<<"=================INPUT==================="<<std::endl;
     A.show();
-
     testNet.Addlayer(new NolinearUnit<double,10,5>(new SigmoidActivator<double>()));
-
     testNet.Addlayer(new NolinearUnit<double,5,2>(new SigmoidActivator<double>()));
-
-
     std::cout<<"==================RESULT=================="<<std::endl;
     testNet.run(A).show();
     std::cout<<"=================TRAIN==================="<<std::endl;
-
+    double result[]={0,1};
+    Array<double> B(2,1,result,2);
+    SquareLoss<double> lossFun;
+    testNet.train(A,B,lossFun); 
+    std::cout<<"================END==================="<<std::endl;
 #endif
     return true;
 }

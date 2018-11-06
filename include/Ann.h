@@ -51,10 +51,10 @@ Y υ [upsilon] 宇普西龙
 /*********************************激活函数**********************************/
 //激活函数和损失函数抽象
 template<class T>
-class BaseFun{
+class ActiveFun{
     public:
-        BaseFun(){};
-        virtual ~BaseFun(){};
+        ActiveFun(){};
+        virtual ~ActiveFun(){};
 
         //前向运算
         virtual T front(T value)=0;
@@ -66,7 +66,7 @@ class BaseFun{
 
 /*tanh激活函数*/
 template<class T>
-class TanhActivator:public BaseFun<T>{
+class TanhActivator:public ActiveFun<T>{
         TanhActivator(){};
         ~TanhActivator(){};
         //前向运算
@@ -98,7 +98,7 @@ Array<T> TanhActivator<T>::back(Array<T>& array){
 
 /*Sigmoid激活函数*/
 template<class T>
-class SigmoidActivator:public BaseFun<T>{
+class SigmoidActivator:public ActiveFun<T>{
     public:
         SigmoidActivator(){};
         ~SigmoidActivator(){};
@@ -130,38 +130,98 @@ Array<T> SigmoidActivator<T>::back(Array<T>& array){
 }
 
 /*********************************损失函数**********************************/
+template<class T>
+class LossFun{
+    public:
+        LossFun(){};
+        virtual ~LossFun(){};
+        //前向运算
+        T front(T value,T result); 
+        virtual T front(Array<T>& array,Array<T>& result)=0;
+        virtual T front(Array<T>& array,Array<T>&& result)=0;
+        virtual T front(Array<T>&& array,Array<T>& result)=0;
+        virtual T front(Array<T>&& array,Array<T>&& result)=0;
+        //反向运算
+        T back(T value,T result);
+        virtual Array<T> back(Array<T>& array,Array<T>& result)=0;
+        virtual Array<T> back(Array<T>& array,Array<T>&& result)=0;
+        virtual Array<T> back(Array<T>&& array,Array<T>& result)=0;
+        virtual Array<T> back(Array<T>&& array,Array<T>&& result)=0;
+};
+
+
 /*平方差函数*/
 template<class T>
-class SquareLoss:public BaseFun<T>{
+class SquareLoss:public LossFun<T>{
     public:
         SquareLoss(){};
         ~SquareLoss(){};
         //前向运算
-        T front(T value); 
-        Array<T> front(Array<T>& array);
-        //反向传播
-        T back(T value);
-        Array<T> back(Array<T>& array);
+        T front(T value,T result); 
+        T front(Array<T>& array,Array<T>& result);
+        T front(Array<T>& array,Array<T>&& result);
+        T front(Array<T>&& array,Array<T>& result);
+        T front(Array<T>&& array,Array<T>&& result);
+        //反向运算
+        T back(T value,T result);
+        Array<T> back(Array<T>& array,Array<T>& result);
+        Array<T> back(Array<T>& array,Array<T>&& result);
+        Array<T> back(Array<T>&& array,Array<T>& result);
+        Array<T> back(Array<T>&& array,Array<T>&& result);
 };
 
 template<class T>
-T SquareLoss<T>::front(T value)
+T SquareLoss<T>::front(T value,T result)
 {
+    return (value-result)*(value-result)/2;
 }
 
 template<class T>
-Array<T> SquareLoss<T>::front(Array<T>& array)
+T SquareLoss<T>::front(Array<T>& array,Array<T>& result)
 {
+    return ((array-result)*(array-result)).squareSum()/2;
+}
+template<class T>
+T SquareLoss<T>::front(Array<T>&& array,Array<T>& result)
+{
+    return ((array-result)*(array-result)).squareSum()/2;
+}
+template<class T>
+T SquareLoss<T>::front(Array<T>& array,Array<T>&& result)
+{
+    return ((array-result)*(array-result)).squareSum()/2;
+}
+template<class T>
+T SquareLoss<T>::front(Array<T>&& array,Array<T>&& result)
+{
+    return ((array-result)*(array-result)).squareSum()/2;
 }
 
 template<class T>
-T SquareLoss<T>::back(T value)
+T SquareLoss<T>::back(T value,T result)
 {
+    return -(result-value);
 }
 
 template<class T>
-Array<T> SquareLoss<T>::back(Array<T>& array)
+Array<T> SquareLoss<T>::back(Array<T>& array,Array<T>& result)
 {
+    return -(result-array).T();
+}
+template<class T>
+Array<T> SquareLoss<T>::back(Array<T>&& array,Array<T>& result)
+{
+    return -(result-array).T();
+}
+template<class T>
+Array<T> SquareLoss<T>::back(Array<T>& array,Array<T>&& result)
+{
+    return -(result-array).T();
+}
+template<class T>
+Array<T> SquareLoss<T>::back(Array<T>&& array,Array<T>&& result)
+{
+    return -(result-array).T();
 }
 
 /*********************************基本单元**********************************/
@@ -176,7 +236,7 @@ class BaseUnit{
         BaseUnit(const char* name):property(name){};
         virtual ~BaseUnit(){};
         //方法
-        virtual unsigned int GOutSize()=0;
+        virtual unsigned int getOutSize() const=0;
         virtual Array<T> getw() const =0;
         virtual Array<T> getδ() const =0;
         virtual Array<T> getbias() const =0;
@@ -205,15 +265,15 @@ class NolinearUnit:public BaseUnit<T>{
         //单元当前输入值,m*1的数组
         Array<T>  InputValue;
         //单元激活函数
-        BaseFun<T> *Active;
+        ActiveFun<T> *Active;
         //单元初始化函数
         bool ParamInit(Array<T>& value);
     public:
-        NolinearUnit(BaseFun<T> *fun,int M=m,int N=n);
+        NolinearUnit(ActiveFun<T> *fun,int M=m,int N=n);
         ~NolinearUnit();
 
         //单元流程
-        unsigned int GOutSize(){return OutputSize;};
+        unsigned int getOutSize() const {return OutputSize;};
         Array<T> getw() const {return weight;};
         Array<T> getδ() const {return δ;};
         Array<T> getbias() const {return bias;};
@@ -222,7 +282,7 @@ class NolinearUnit:public BaseUnit<T>{
 };
 
 template <class T,int m,int n>
-NolinearUnit<T,m,n>::NolinearUnit(BaseFun<T> *fun,int M,int N):BaseUnit<T>("NolinearUnit"),
+NolinearUnit<T,m,n>::NolinearUnit(ActiveFun<T> *fun,int M,int N):BaseUnit<T>("NolinearUnit"),
                                                             InputSize(M),
                                                             OutputSize(N),
                                                             weight(M,N,0),
@@ -274,39 +334,163 @@ Array<T> NolinearUnit<T,m,n>::UnitBack(Array<T>& Nextδ,Array<T>& NextWeight)
 {
     //更新权重,权重为和此节点下游连接所有节点的权重和δ值,假设下游节点k个，权重矩阵为n*k，误差项为1*k个
     //step 1:计算loss对单元输入导数的误差项
+    LOG_WARN("MARK 1");
+    printf("%p\n",&Nextδ);
+    printf("%p\n",&NextWeight);
+    printf("%p\n",&Out);
+    printf("%p\n",&δ);
+    printf("%p\n",&bias);
+    printf("%p\n",&weight);
+    printf("%p\n",&InputValue);
+    
     δ = Active->back(Out)*Array<T>::dot(NextWeight,Nextδ.T()).T();
     //step 2:更新权重矩阵 m*1 dot 1*n 为梯度
-    weight = weight-η*InputValue*δ;
+    δ.show();
+    LOG_WARN("MARK 2 δ Line"<<δ.getLine()<<" row"<<δ.getRow());
+    InputValue.show();
+    LOG_WARN("MARK 3");
+    weight.show();
+    weight = weight-η*Array<T>::dot(InputValue,δ);
+    LOG_WARN("MARK 4");
+    weight.show();
     //step 3:更新偏置矩阵 
     bias = bias - η*δ;
+    LOG_WARN("MARK 5");
     //更新输入矩阵
     Nextδ = δ;
+    LOG_WARN("MARK 6");
+    NextWeight.show();
+    LOG_WARN("MARK 6.3");
+    weight.show();
     NextWeight = weight;
+    LOG_WARN("MARK 7");
+    NextWeight.show();
+    LOG_WARN("MARK 8");
     //返回本节点误差项
-    return this->δ;
+    return δ;
 }
 
 //Network Connected Module
 //数据传播网络抽象，主要成员是层组件向量
+template<class M>
 class FCLNet{
     private:
         //vector存储所有层
-        std::vector<BaseUnit<double>*> layerVector;
+        std::vector<BaseUnit<M>*> layerVector;
     public:
         FCLNet();
         ~FCLNet();
         //增加层 
-        bool Addlayer(BaseUnit<double>* newLayer,int Index=0);
+        bool Addlayer(BaseUnit<M>* newLayer,int Index=0);
         //前向传播
-        Array<double> run(Array<double>& indata);
+        Array<M> run(Array<M>& indata);
         //反向传播,模版成员函数
-        template <class M>
-        M train(Array<double>& X,Array<double>& Y,BaseFun<M>* lossFun,bool enable);
+        M train(Array<M>& X,Array<M>& Y,LossFun<M>& lossFun,bool enable=true);
         //快速索引
-        BaseUnit<double>* operator[](unsigned int index);
+        BaseUnit<M>* operator[](unsigned int index);
 };
 
+//网络层向量初始化
+template<class M>
+FCLNet<M>::FCLNet():layerVector()
+{
+}
 
+template<class M>
+FCLNet<M>::~FCLNet()
+{
+    //析构所有层
+    for(int i=0;i<layerVector.size();i++)
+    {
+        if(NULL != layerVector[i])
+        {
+           delete layerVector[i]; 
+        }
+    }
+}
+//添加一个层,默认在尾部增加
+template<class M>
+bool FCLNet<M>::Addlayer(BaseUnit<M>* newLayer,int Index)
+{
+    if(NULL == newLayer)
+    {
+        LOG_ERR("Add layer is empty!")
+    }
+
+    if(true == layerVector.empty())
+    {
+        layerVector.push_back(newLayer);
+    }
+    else
+    {
+        std::vector<BaseUnit<double>*>::iterator it=layerVector.end();
+        for(int i=0;it!=layerVector.begin();it--,i++)
+        {
+            if(i == Index)
+            {
+                break;
+            }
+        }
+        //插入
+        layerVector.insert(it,newLayer);
+    }
+
+    return true;
+}
+//输入数据，做网络计算,返回最后一个计算数组
+template<class M>
+Array<M> FCLNet<M>::run(Array<M>& indata)
+{
+    int i = 0;
+    Array<M> tempdata = indata;
+    for(i=0;i<layerVector.size();i++)
+    {
+       tempdata = layerVector[i]->UnitFront(tempdata); 
+    }
+    return tempdata;
+}
+
+//训练方法,输入训练数据和损失函数
+template<class M>
+M FCLNet<M>::train(Array<M>& X,Array<M>& Y,LossFun<M>& lossFun,bool enable)
+{
+    int i = 0;
+    //step 1:获取输出个数
+    BaseUnit<M>* outlayer = layerVector[layerVector.size()-1]; 
+    int outSize = outlayer->getOutSize();
+    //step 2:从损失函数，推倒出末端节点输入的Nextδ和NextWeight
+    //最后一层节点衍生一层，涉及激活函数包括进统一过程做迭代处理
+    //  *->o 直接关系如左，o节点的δ由损失函数对o求导，并在y点处的值
+    //  *->o 而w，实际上可以看作衍生全连接层，对应关联的节点连接权值为1，其余的为0
+    //  *->o 因此构造的w是一个diag（1）单位矩阵，输出为最后一层输出的个数
+    Array<M> tempδ(1,outSize,0);
+    Array<M> tempw(outSize,outSize,0);
+    //step 3:初始化输入矩阵
+    tempw.diag(1);//W用1进行对角化
+    tempw.show();
+    tempδ = lossFun.back(run(X),Y);//对矩阵Y每个元素执行func后，赋值给tempδ
+    tempδ.show(); 
+    //step 4:反向传播迭代 of course from back to begin
+    for(i=layerVector.size()-1;i>=0;i--)
+    {
+        LOG_INFO("MARK 6."<<i);
+        layerVector[i]->UnitBack(tempδ,tempw);
+        //Now tempw&tempw update in UnitBack
+        //tempδ = layerVector[i]->getδ();
+        //tempw = layerVector[i]->getw();
+    }
+        LOG_INFO("MARK 7");
+    //返回本次训练后的当前的loss值
+    //return enable?lossFun.front(run(X),Y):0;
+    return 0;
+}
+
+
+template<class M>
+BaseUnit<M>* FCLNet<M>::operator[](unsigned int index)
+{
+    return  index>=layerVector.size()?NULL:layerVector[index]; 
+}
 
 //2卷积网络组件：
 //A卷积单元
