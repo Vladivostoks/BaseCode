@@ -334,38 +334,14 @@ Array<T> NolinearUnit<T,m,n>::UnitBack(Array<T>& Nextδ,Array<T>& NextWeight)
 {
     //更新权重,权重为和此节点下游连接所有节点的权重和δ值,假设下游节点k个，权重矩阵为n*k，误差项为1*k个
     //step 1:计算loss对单元输入导数的误差项
-    LOG_WARN("MARK 1");
-    printf("%p\n",&Nextδ);
-    printf("%p\n",&NextWeight);
-    printf("%p\n",&Out);
-    printf("%p\n",&δ);
-    printf("%p\n",&bias);
-    printf("%p\n",&weight);
-    printf("%p\n",&InputValue);
-    
     δ = Active->back(Out)*Array<T>::dot(NextWeight,Nextδ.T()).T();
     //step 2:更新权重矩阵 m*1 dot 1*n 为梯度
-    δ.show();
-    LOG_WARN("MARK 2 δ Line"<<δ.getLine()<<" row"<<δ.getRow());
-    InputValue.show();
-    LOG_WARN("MARK 3");
-    weight.show();
     weight = weight-η*Array<T>::dot(InputValue,δ);
-    LOG_WARN("MARK 4");
-    weight.show();
     //step 3:更新偏置矩阵 
     bias = bias - η*δ;
-    LOG_WARN("MARK 5");
     //更新输入矩阵
     Nextδ = δ;
-    LOG_WARN("MARK 6");
-    NextWeight.show();
-    LOG_WARN("MARK 6.3");
-    weight.show();
     NextWeight = weight;
-    LOG_WARN("MARK 7");
-    NextWeight.show();
-    LOG_WARN("MARK 8");
     //返回本节点误差项
     return δ;
 }
@@ -467,22 +443,17 @@ M FCLNet<M>::train(Array<M>& X,Array<M>& Y,LossFun<M>& lossFun,bool enable)
     Array<M> tempw(outSize,outSize,0);
     //step 3:初始化输入矩阵
     tempw.diag(1);//W用1进行对角化
-    tempw.show();
     tempδ = lossFun.back(run(X),Y);//对矩阵Y每个元素执行func后，赋值给tempδ
-    tempδ.show(); 
     //step 4:反向传播迭代 of course from back to begin
     for(i=layerVector.size()-1;i>=0;i--)
     {
-        LOG_INFO("MARK 6."<<i);
         layerVector[i]->UnitBack(tempδ,tempw);
         //Now tempw&tempw update in UnitBack
         //tempδ = layerVector[i]->getδ();
         //tempw = layerVector[i]->getw();
     }
-        LOG_INFO("MARK 7");
     //返回本次训练后的当前的loss值
-    //return enable?lossFun.front(run(X),Y):0;
-    return 0;
+    return enable?lossFun.front(run(X),Y):0;
 }
 
 

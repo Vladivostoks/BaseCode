@@ -157,7 +157,10 @@ bool FCLNetTestFunc()
     double result[]={0,1};
     Array<double> B(2,1,result,2);
     SquareLoss<double> lossFun;
-    testNet.train(A,B,lossFun); 
+    for(int i=0;i<5000;i++)
+    {
+        LOG_INFO("["<<i<<"]Loss Value "<<testNet.train(A,B,lossFun));
+    }
     std::cout<<"================END==================="<<std::endl;
 #endif
     return true;
