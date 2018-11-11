@@ -142,27 +142,49 @@ bool ArrayTestFunc()
 
 bool FCLNetTestFunc()
 {
-#if 1
+    /*做一个简单异或运算网络的demo*/
     FCLNet<double> testNet;
+    struct Sample{
+        Array<double> input;
+        Array<double> result;
+        Sample(double A[],double B[]):input(1,2,A,2),result(1,1,B,1){};
+    };
+    double resultA[]={0};
+    double InputA[]={0,0};
 
-    Array<double> A(10,1);
-    A.random(-15,15);
+    double resultB[]={1};
+    double InputB[]={0,1};
+
+    double resultC[]={1};
+    double InputC[]={1,0};
+
+    double resultD[]={0};
+    double InputD[]={1,1};
+    Sample S[]={Sample(InputA,resultA),
+                Sample(InputB,resultB),
+                Sample(InputC,resultC),
+                Sample(InputD,resultD)};
+   
     std::cout<<"=================INPUT==================="<<std::endl;
-    A.show();
-    testNet.Addlayer(new NolinearUnit<double,10,5>(new SigmoidActivator<double>()));
-    testNet.Addlayer(new NolinearUnit<double,5,2>(new SigmoidActivator<double>()));
-    std::cout<<"==================RESULT=================="<<std::endl;
-    testNet.run(A).show();
+    testNet.Addlayer(new NolinearUnit<double,2,2>(new SigmoidActivator<double>()));
+    testNet.Addlayer(new NolinearUnit<double,2,1>(new SigmoidActivator<double>()));
+    
     std::cout<<"=================TRAIN==================="<<std::endl;
-    double result[]={0,1};
-    Array<double> B(2,1,result,2);
     SquareLoss<double> lossFun;
-    for(int i=0;i<5000;i++)
+    //Stochastic gradient 随机梯度 
+    for(int i=0;i<5000000;i++)
     {
-        LOG_INFO("["<<i<<"]Loss Value "<<testNet.train(A,B,lossFun));
+        Sample& temp = S[i%4];
+        LOG_INFO("["<<i<<"]Loss Value "<<
+                testNet.train(temp.input,temp.result,lossFun));
+        
+    }
+    std::cout<<"==================RESULT=================="<<std::endl;
+    for(int i=0;i<4;i++)
+    {
+        testNet.run(S[i].input).show();
     }
     std::cout<<"================END==================="<<std::endl;
-#endif
     return true;
 }
 

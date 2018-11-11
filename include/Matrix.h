@@ -15,6 +15,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <random>
 
 #include "sysTool.h"
 #include "General.h"
@@ -547,11 +548,15 @@ Array<M>& Array<M>::T()
 template <class M>
 Array<M>& Array<M>::random(M min,M max)
 {
+    std::default_random_engine random(time(NULL));
+    //均匀分布随机数
+    std::uniform_real_distribution<double> dis(min,max);
+
     for(int i=0;i<getLine();i++)
     {
         for(int j=0;j<getRow();j++)
         {
-            (*this)[i][j]=((double)rand()/RAND_MAX)*(max-min) + min;
+            (*this)[i][j]=dis(random);
         }
     }
     return *this;

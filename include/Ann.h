@@ -46,7 +46,7 @@ Y υ [upsilon] 宇普西龙
 
 /*********************************配置选项**********************************/
 //学习率
-#define η   0.1
+#define η   0.0001
 
 /*********************************激活函数**********************************/
 //激活函数和损失函数抽象
@@ -206,22 +206,22 @@ T SquareLoss<T>::back(T value,T result)
 template<class T>
 Array<T> SquareLoss<T>::back(Array<T>& array,Array<T>& result)
 {
-    return -(result-array).T();
+    return -(result-array);
 }
 template<class T>
 Array<T> SquareLoss<T>::back(Array<T>&& array,Array<T>& result)
 {
-    return -(result-array).T();
+    return -(result-array);
 }
 template<class T>
 Array<T> SquareLoss<T>::back(Array<T>& array,Array<T>&& result)
 {
-    return -(result-array).T();
+    return -(result-array);
 }
 template<class T>
 Array<T> SquareLoss<T>::back(Array<T>&& array,Array<T>&& result)
 {
-    return -(result-array).T();
+    return -(result-array);
 }
 
 /*********************************基本单元**********************************/
@@ -258,11 +258,11 @@ class NolinearUnit:public BaseUnit<T>{
         Array<T>  weight;
         //单元偏置,1*n矩阵，表示n个单元
         Array<T>  bias;
-        //单元输出,1*n个输出
+        //单元激活函数输入,1*n个单元
         Array<T>  Out;
         //单元误差项,loss对单元输入的导数,1*n个误差项
         Array<T>   δ;
-        //单元当前输入值,m*1的数组
+        //单元当前输入值,1*m的数组
         Array<T>  InputValue;
         //单元激活函数
         ActiveFun<T> *Active;
@@ -289,7 +289,7 @@ NolinearUnit<T,m,n>::NolinearUnit(ActiveFun<T> *fun,int M,int N):BaseUnit<T>("No
                                                             bias(1,N,0),
                                                             Out(1,N,0),
                                                             δ(1,N,0),
-                                                            InputValue(M,1,0),
+                                                            InputValue(1,M,0),
                                                             Active(fun)
 {
     //初始化单元权重和状态
@@ -305,12 +305,12 @@ NolinearUnit<T,m,n>::~NolinearUnit()
     }
 }
 
-//#TODO 确认矩阵初始化的值
+//确认矩阵初始化的值
 template <class T,int m,int n>
 bool NolinearUnit<T,m,n>::ParamInit(Array<T>& value)
 {
-    //矩阵随机初始化,先随便定个范围
-    value.random(-15,15);
+    //矩阵随机初始化,范围内均匀分布随机数,先随便定个范围
+    value.random(-2,2);
     return true;
 }
 
@@ -321,12 +321,8 @@ Array<T> NolinearUnit<T,m,n>::UnitFront(const Array<T>& input)
     //记录输入值
     InputValue = input;
     //输入进行矩阵运算 
-    Array<T> result = Array<T>::dot(weight.T(),InputValue).T()+bias;
-    //还原weigt
-    weight.T();
-    //转置后，再输出
-    result.T();
-    return Active->front(result);
+    Out = Array<T>::dot(InputValue,weight)+bias;
+    return Active->front(Out);
 }
 
 template <class T,int m,int n>
@@ -334,9 +330,9 @@ Array<T> NolinearUnit<T,m,n>::UnitBack(Array<T>& Nextδ,Array<T>& NextWeight)
 {
     //更新权重,权重为和此节点下游连接所有节点的权重和δ值,假设下游节点k个，权重矩阵为n*k，误差项为1*k个
     //step 1:计算loss对单元输入导数的误差项
-    δ = Active->back(Out)*Array<T>::dot(NextWeight,Nextδ.T()).T();
-    //step 2:更新权重矩阵 m*1 dot 1*n 为梯度
-    weight = weight-η*Array<T>::dot(InputValue,δ);
+    δ = Active->back(Out)*Array<T>::dot(Nextδ,NextWeight.T());
+    //step 2:更新权重矩阵 输入是1*m dot 1*n 为梯度 weight m*n
+    weight = weight-η*Array<T>::dot(InputValue.T(),δ);
     //step 3:更新偏置矩阵 
     bias = bias - η*δ;
     //更新输入矩阵
@@ -426,7 +422,7 @@ Array<M> FCLNet<M>::run(Array<M>& indata)
     return tempdata;
 }
 
-//训练方法,输入训练数据和损失函数
+//训练方法,输入训练数据和损失函数,支持一次多组数据
 template<class M>
 M FCLNet<M>::train(Array<M>& X,Array<M>& Y,LossFun<M>& lossFun,bool enable)
 {
@@ -443,14 +439,13 @@ M FCLNet<M>::train(Array<M>& X,Array<M>& Y,LossFun<M>& lossFun,bool enable)
     Array<M> tempw(outSize,outSize,0);
     //step 3:初始化输入矩阵
     tempw.diag(1);//W用1进行对角化
-    tempδ = lossFun.back(run(X),Y);//对矩阵Y每个元素执行func后，赋值给tempδ
+    //对矩阵Y每个元素执行func后，赋值给tempδ
+    tempδ = lossFun.back(run(X),Y);
     //step 4:反向传播迭代 of course from back to begin
     for(i=layerVector.size()-1;i>=0;i--)
     {
-        layerVector[i]->UnitBack(tempδ,tempw);
         //Now tempw&tempw update in UnitBack
-        //tempδ = layerVector[i]->getδ();
-        //tempw = layerVector[i]->getw();
+        layerVector[i]->UnitBack(tempδ,tempw);
     }
     //返回本次训练后的当前的loss值
     return enable?lossFun.front(run(X),Y):0;
