@@ -149,6 +149,7 @@ class Array{
         unsigned long spaceSize;
         
      public:
+        Array();
         Array(unsigned int line,unsigned int row,M defaultValue=0);
         ~Array();
         //get info
@@ -212,10 +213,20 @@ class Array{
         static Array<M> dot(Array<M>& left,Array<M>& right);
 
         Array<M>& diag(const M Value);
+        Array<M>& clear();
         //矩阵打印
         void show();
 };
-
+//defualt init without param
+template <class M>
+Array<M>::Array():Line(0),
+                  Row(0),
+                  flagT(false),
+                  address(NULL),
+                  Index(Line,Row,NULL),
+                  spaceSize(0)
+{
+}
 template <class M>
 Array<M>::Array(unsigned int line,unsigned int row,M defaultValue):Line(line),
                                                                    Row(row),
@@ -573,6 +584,11 @@ Array<M> Array<M>::dot(Array<M>& left,Array<M>& right)
     if(left.getRow() != right.getLine())
     {
         LOG_ERR("Array dot illigal,left row["<<left.getRow()<<"] is not same with right line["<<right.getLine()<<"]");
+        LOG_ERR("========left============");
+        left.show();
+        LOG_ERR("========right===========");
+        right.show();
+        LOG_ERR("=========end============");
         return tempArray;
     }
     //same result
@@ -611,7 +627,20 @@ Array<M>& Array<M>::diag(const M Value)
     }
     return *this;
 }
-
+//clear Array
+template<class M>
+Array<M>& Array<M>::clear()
+{
+   if(NULL != address)
+   {
+        memset(address,0,spaceSize);
+   }
+   else
+   {
+       LOG_WARN("clear Array is empty");
+   }
+   return *this;
+}
 
 //数乘
 template <class M>
@@ -1133,4 +1162,5 @@ void Array<M>::show()
     }
     return;
 }
+
 #endif

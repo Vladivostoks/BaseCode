@@ -139,50 +139,51 @@ bool ArrayTestFunc()
     std::cout<<"====================END==================="<<std::endl;
     return true;
 }
-
+//训练次数
+#define TRAIN   500000
 bool FCLNetTestFunc()
 {
     /*做一个简单异或运算网络的demo*/
     FCLNet<double> testNet;
-    struct Sample{
-        Array<double> input;
-        Array<double> result;
-        Sample(double A[],double B[]):input(1,2,A,2),result(1,1,B,1){};
-    };
+    
     double resultA[]={0};
-    double InputA[]={0,0};
+    double inputA[]={0,0};
 
     double resultB[]={1};
-    double InputB[]={0,1};
+    double inputB[]={0,1};
 
     double resultC[]={1};
-    double InputC[]={1,0};
+    double inputC[]={1,0};
 
     double resultD[]={0};
-    double InputD[]={1,1};
-    Sample S[]={Sample(InputA,resultA),
-                Sample(InputB,resultB),
-                Sample(InputC,resultC),
-                Sample(InputD,resultD)};
-   
+    double inputD[]={1,1};
+
+    Array<double>Input[]={Array<double>(1,2,inputA,2),
+                          Array<double>(1,2,inputB,2),
+                          Array<double>(1,2,inputC,2),
+                          Array<double>(1,2,inputD,2)};
+
+    Array<double>Result[]={Array<double>(1,1,resultA,1),
+                           Array<double>(1,1,resultB,1),
+                           Array<double>(1,1,resultC,1),
+                           Array<double>(1,1,resultD,1)};
     std::cout<<"=================INPUT==================="<<std::endl;
-    testNet.Addlayer(new NolinearUnit<double,2,2>(new SigmoidActivator<double>()));
-    testNet.Addlayer(new NolinearUnit<double,2,1>(new SigmoidActivator<double>()));
+    testNet.Addlayer(new NolinearUnit<double,2,3,4>(new SigmoidActivator<double>()));
+    testNet.Addlayer(new NolinearUnit<double,3,1,4>(new SigmoidActivator<double>()));
     
     std::cout<<"=================TRAIN==================="<<std::endl;
     SquareLoss<double> lossFun;
     //Stochastic gradient 随机梯度 
-    for(int i=0;i<5000000;i++)
+    for(int i=0;i<TRAIN;i++)
     {
-        Sample& temp = S[i%4];
-        LOG_INFO("["<<i<<"]Loss Value "<<
-                testNet.train(temp.input,temp.result,lossFun));
+        LOG_INFO("["<<i<<"]["<<i*1.0/TRAIN*100<<"%]Loss Value "<<
+            testNet.train(Input,Result,lossFun,4));
         
     }
     std::cout<<"==================RESULT=================="<<std::endl;
     for(int i=0;i<4;i++)
     {
-        testNet.run(S[i].input).show();
+        testNet.run(Input[i]).show();
     }
     std::cout<<"================END==================="<<std::endl;
     return true;

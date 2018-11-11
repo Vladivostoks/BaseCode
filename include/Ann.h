@@ -46,7 +46,7 @@ Y υ [upsilon] 宇普西龙
 
 /*********************************配置选项**********************************/
 //学习率
-#define η   0.0001
+#define η   0.05
 
 /*********************************激活函数**********************************/
 //激活函数和损失函数抽象
@@ -238,16 +238,15 @@ class BaseUnit{
         //方法
         virtual unsigned int getOutSize() const=0;
         virtual Array<T> getw() const =0;
-        virtual Array<T> getδ() const =0;
         virtual Array<T> getbias() const =0;
         virtual Array<T> UnitFront(const Array<T>& input)=0;
-        virtual Array<T> UnitBack(Array<T>& Nextδ,Array<T>& NextWeight)=0;
+        virtual bool UnitBack(Array<T>* Nextδ,Array<T>& NextWeight,unsigned int num=1)=0;
 };
 
 //训练的根本是根据误差项对w的梯度，对w进行调整
 //1全连接网络组件：
-//A 非线形感知层 接受m个输入，进行n输出
-template <class T,int m,int n>
+//A 非线形感知层 接受m个输入，进行n输出,一个单元缓存最近的IndexSum组数据
+template <class T,int m,int n,int IndexSum=1>
 class NolinearUnit:public BaseUnit<T>{
     private:
         //单元输入个数，对应权重数
@@ -258,12 +257,14 @@ class NolinearUnit:public BaseUnit<T>{
         Array<T>  weight;
         //单元偏置,1*n矩阵，表示n个单元
         Array<T>  bias;
+        //当前缓存序号
+        unsigned int Index;
         //单元激活函数输入,1*n个单元
-        Array<T>  Out;
+        Array<T>*  Out;
         //单元误差项,loss对单元输入的导数,1*n个误差项
-        Array<T>   δ;
+        Array<T>*   δ;
         //单元当前输入值,1*m的数组
-        Array<T>  InputValue;
+        Array<T>*  InputValue;
         //单元激活函数
         ActiveFun<T> *Active;
         //单元初始化函数
@@ -275,29 +276,46 @@ class NolinearUnit:public BaseUnit<T>{
         //单元流程
         unsigned int getOutSize() const {return OutputSize;};
         Array<T> getw() const {return weight;};
-        Array<T> getδ() const {return δ;};
         Array<T> getbias() const {return bias;};
         Array<T> UnitFront(const Array<T>& input);
-        Array<T> UnitBack(Array<T>& Nextδ,Array<T>& NextWeight);
+        bool UnitBack(Array<T>* Nextδ,Array<T>& NextWeight,unsigned int num=1);
 };
 
-template <class T,int m,int n>
-NolinearUnit<T,m,n>::NolinearUnit(ActiveFun<T> *fun,int M,int N):BaseUnit<T>("NolinearUnit"),
+template <class T,int m,int n,int IndexSum>
+NolinearUnit<T,m,n,IndexSum>::NolinearUnit(ActiveFun<T> *fun,int M,int N):BaseUnit<T>("NolinearUnit"),
                                                             InputSize(M),
                                                             OutputSize(N),
                                                             weight(M,N,0),
                                                             bias(1,N,0),
-                                                            Out(1,N,0),
-                                                            δ(1,N,0),
-                                                            InputValue(1,M,0),
+                                                            Index(0),
+                                                            Out(NULL),
+                                                            δ(NULL),
+                                                            InputValue(NULL),
                                                             Active(fun)
 {
     //初始化单元权重和状态
     ParamInit(weight);
+    //计算数组缓存初始化
+    Out = new Array<T>[IndexSum];
+    δ = new Array<T>[IndexSum];
+    InputValue = new Array<T>[IndexSum];
+    if(NULL == Out || NULL == δ || NULL == InputValue)
+    {
+        LOG_ERR("NolinearUnit Creat failed");
+    }
+    else
+    {
+        for(int i=0;i<IndexSum;i++)
+        {
+            Out[i] = Array<T>(1,N);
+            δ[i] = Array<T>(1,N);
+            InputValue[i] = Array<T>(1,M);
+        }
+    }
 }
 
-template <class T,int m,int n>
-NolinearUnit<T,m,n>::~NolinearUnit()
+template <class T,int m,int n,int IndexSum>
+NolinearUnit<T,m,n,IndexSum>::~NolinearUnit()
 {
     if(NULL != Active)
     {
@@ -306,8 +324,8 @@ NolinearUnit<T,m,n>::~NolinearUnit()
 }
 
 //确认矩阵初始化的值
-template <class T,int m,int n>
-bool NolinearUnit<T,m,n>::ParamInit(Array<T>& value)
+template <class T,int m,int n,int IndexSum>
+bool NolinearUnit<T,m,n,IndexSum>::ParamInit(Array<T>& value)
 {
     //矩阵随机初始化,范围内均匀分布随机数,先随便定个范围
     value.random(-2,2);
@@ -315,35 +333,69 @@ bool NolinearUnit<T,m,n>::ParamInit(Array<T>& value)
 }
 
 
-template <class T,int m,int n>
-Array<T> NolinearUnit<T,m,n>::UnitFront(const Array<T>& input)
+template <class T,int m,int n,int IndexSum>
+Array<T> NolinearUnit<T,m,n,IndexSum>::UnitFront(const Array<T>& input)
 {
     //记录输入值
-    InputValue = input;
-    //输入进行矩阵运算 
-    Out = Array<T>::dot(InputValue,weight)+bias;
-    return Active->front(Out);
+    InputValue[Index] = input;
+    //输入进行矩阵运算,并记录线形计算输出值
+    Out[Index] = Array<T>::dot(InputValue[Index],weight)+bias;
+    Array<T> rc = Active->front(Out[Index]); 
+    //更新当前缓存数组索引
+    Index = (Index+1)%IndexSum;
+    return rc; 
 }
 
-template <class T,int m,int n>
-Array<T> NolinearUnit<T,m,n>::UnitBack(Array<T>& Nextδ,Array<T>& NextWeight)
+template <class T,int m,int n,int IndexSum>
+bool NolinearUnit<T,m,n,IndexSum>::UnitBack(Array<T>* Nextδ,Array<T>& NextWeight,unsigned int num)
 {
     //更新权重,权重为和此节点下游连接所有节点的权重和δ值,假设下游节点k个，权重矩阵为n*k，误差项为1*k个
     //step 1:计算loss对单元输入导数的误差项
-    δ = Active->back(Out)*Array<T>::dot(Nextδ,NextWeight.T());
+    Array<T> tempWeight= weight;
+    Array<T> tempBias = bias; 
+    tempWeight.clear();
+    tempBias.clear(); 
+    if(NULL == Nextδ)
+    {
+        LOG_ERR("Nextδ is NULL!!");
+        return false;
+    }
+    if(num > IndexSum)
+    {
+        //防止溢出
+        LOG_INFO("Warming data trained overflow IndexSum,should reduce num or increase IndexSum");
+        num = IndexSum;
+    }
+    //从最后一个开始,向前循环
+    for(int i=Index-1,j=0;j<num;j++)
+    {
+        i=i<0?i+IndexSum:i;
+        //δ存对应索引计算出的数组
+        δ[i] = Active->back(Out[i])*Array<T>::dot(Nextδ[i],NextWeight.T());
+        NextWeight.T();
+        tempWeight = tempWeight+η*Array<T>::dot(InputValue[i].T(),δ[i]);
+        InputValue[i].T();
+        tempBias = tempBias+η*δ[i];
+        //循环
+        i--;
+    }
     //step 2:更新权重矩阵 输入是1*m dot 1*n 为梯度 weight m*n
-    weight = weight-η*Array<T>::dot(InputValue.T(),δ);
+    weight = weight-tempWeight;
     //step 3:更新偏置矩阵 
-    bias = bias - η*δ;
+    bias = bias-tempBias;
     //更新输入矩阵
-    Nextδ = δ;
+    for(int i=0;i<num;i++)
+    {
+        Nextδ[i] = δ[i];
+    }
     NextWeight = weight;
     //返回本节点误差项
-    return δ;
+    return true;
 }
 
 //Network Connected Module
 //数据传播网络抽象，主要成员是层组件向量
+
 template<class M>
 class FCLNet{
     private:
@@ -353,11 +405,11 @@ class FCLNet{
         FCLNet();
         ~FCLNet();
         //增加层 
-        bool Addlayer(BaseUnit<M>* newLayer,int Index=0);
+        bool Addlayer(BaseUnit<M>* newLayer,int index=0);
         //前向传播
         Array<M> run(Array<M>& indata);
         //反向传播,模版成员函数
-        M train(Array<M>& X,Array<M>& Y,LossFun<M>& lossFun,bool enable=true);
+        M train(Array<M>* X,Array<M>* Y,LossFun<M>& lossFun,const unsigned int num=1,bool enable=true);
         //快速索引
         BaseUnit<M>* operator[](unsigned int index);
 };
@@ -382,7 +434,7 @@ FCLNet<M>::~FCLNet()
 }
 //添加一个层,默认在尾部增加
 template<class M>
-bool FCLNet<M>::Addlayer(BaseUnit<M>* newLayer,int Index)
+bool FCLNet<M>::Addlayer(BaseUnit<M>* newLayer,int index)
 {
     if(NULL == newLayer)
     {
@@ -398,7 +450,7 @@ bool FCLNet<M>::Addlayer(BaseUnit<M>* newLayer,int Index)
         std::vector<BaseUnit<double>*>::iterator it=layerVector.end();
         for(int i=0;it!=layerVector.begin();it--,i++)
         {
-            if(i == Index)
+            if(i == index)
             {
                 break;
             }
@@ -424,7 +476,7 @@ Array<M> FCLNet<M>::run(Array<M>& indata)
 
 //训练方法,输入训练数据和损失函数,支持一次多组数据
 template<class M>
-M FCLNet<M>::train(Array<M>& X,Array<M>& Y,LossFun<M>& lossFun,bool enable)
+M FCLNet<M>::train(Array<M>* X,Array<M>* Y,LossFun<M>& lossFun,const unsigned int num,bool enable)
 {
     int i = 0;
     //step 1:获取输出个数
@@ -435,20 +487,33 @@ M FCLNet<M>::train(Array<M>& X,Array<M>& Y,LossFun<M>& lossFun,bool enable)
     //  *->o 直接关系如左，o节点的δ由损失函数对o求导，并在y点处的值
     //  *->o 而w，实际上可以看作衍生全连接层，对应关联的节点连接权值为1，其余的为0
     //  *->o 因此构造的w是一个diag（1）单位矩阵，输出为最后一层输出的个数
-    Array<M> tempδ(1,outSize,0);
     Array<M> tempw(outSize,outSize,0);
     //step 3:初始化输入矩阵
     tempw.diag(1);//W用1进行对角化
     //对矩阵Y每个元素执行func后，赋值给tempδ
-    tempδ = lossFun.back(run(X),Y);
+    Array<M>* tempδ = new Array<M>[num];
+    for(i=0;i<num;i++)
+    {
+        tempδ[i] = lossFun.back(run(X[i]),Y[i]);
+    }
     //step 4:反向传播迭代 of course from back to begin
     for(i=layerVector.size()-1;i>=0;i--)
     {
         //Now tempw&tempw update in UnitBack
-        layerVector[i]->UnitBack(tempδ,tempw);
+        layerVector[i]->UnitBack(tempδ,tempw,num);
     }
     //返回本次训练后的当前的loss值
-    return enable?lossFun.front(run(X),Y):0;
+    if(enable)
+    {
+        M ret = 0;
+        for(i=0;i<num;i++)
+        {
+            ret += lossFun.front(run(X[i]),Y[i]);
+        }
+        return ret;
+    }
+    
+    return 0;
 }
 
 
