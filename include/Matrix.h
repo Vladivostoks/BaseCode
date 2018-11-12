@@ -156,7 +156,7 @@ class Array{
         unsigned int getLine() const {if(flagT){return Row;} return Line;};
         unsigned int getRow() const {if(flagT){return Line;} return Row;};
         //const M* getAddr const {return address;};
-        //unsigned long getSize() const {return spaceSize;};
+        unsigned long getSize() const {return spaceSize;};
         //bool getflagT() const {return flagT;};
         //Vector getIndex() const {return Index;};
    
@@ -214,6 +214,7 @@ class Array{
 
         Array<M>& diag(const M Value);
         Array<M>& clear();
+        bool MemSave(char*& mem);
         //矩阵打印
         void show();
 };
@@ -1144,6 +1145,25 @@ M Array<M>::squareSum()
         }
     }
     return sum;
+}
+//数组保存
+template<class M>
+bool Array<M>::MemSave(char *&mem)
+{
+    Array<M>* head=reinterpret_cast<Array<M>*>(mem);
+    if(NULL != mem)
+    {
+        //复制管理部分
+        memcpy(head,this,sizeof(Array<M>));
+        //复制数据部分
+        memcpy(mem+sizeof(Array<M>),address,spaceSize);
+        //改变数据指向位置
+        head->address=reinterpret_cast<M*>(mem+sizeof(Array<M>));
+        //自增
+        mem+=spaceSize+sizeof(Array<M>);
+        return true;
+    }
+    return false;
 }
 
 template<class M>

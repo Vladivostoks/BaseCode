@@ -241,6 +241,10 @@ class BaseUnit{
         virtual Array<T> getbias() const =0;
         virtual Array<T> UnitFront(const Array<T>& input)=0;
         virtual bool UnitBack(Array<T>* Nextδ,Array<T>& NextWeight,unsigned int num=1)=0;
+        //单元参数导入方法
+        virtual bool ParamInstall(char *mem)=0;
+        //单元参数导出方法
+        virtual bool ParamSave(char *mem,unsigned int& size)=0;
 };
 
 //训练的根本是根据误差项对w的梯度，对w进行调整
@@ -269,6 +273,14 @@ class NolinearUnit:public BaseUnit<T>{
         ActiveFun<T> *Active;
         //单元初始化函数
         bool ParamInit(Array<T>& value);
+
+        //导入导出结构体
+        typedef struct{
+            int InputNum;
+            int OutputNum; 
+            //md5摘要
+            unsigned char Digest[16];
+        }Param;
     public:
         NolinearUnit(ActiveFun<T> *fun,int M=m,int N=n);
         ~NolinearUnit();
@@ -277,7 +289,13 @@ class NolinearUnit:public BaseUnit<T>{
         unsigned int getOutSize() const {return OutputSize;};
         Array<T> getw() const {return weight;};
         Array<T> getbias() const {return bias;};
+        //参数导入
+        bool ParamInstall(char *mem);
+        //参数导出
+        bool ParamSave(char *mem,unsigned int& size);
+        //前向计算
         Array<T> UnitFront(const Array<T>& input);
+        //反响计算
         bool UnitBack(Array<T>* Nextδ,Array<T>& NextWeight,unsigned int num=1);
 };
 
@@ -332,7 +350,58 @@ bool NolinearUnit<T,m,n,IndexSum>::ParamInit(Array<T>& value)
     return true;
 }
 
+//#TODO 参数导入
+template <class T,int m,int n,int IndexSum>
+bool NolinearUnit<T,m,n,IndexSum>::ParamInstall(char *mem)
+{
+    //step1:校验
+    //
+    //step2:导入
+    return true;
+}
 
+//参数导出
+template <class T,int m,int n,int IndexSum>
+bool NolinearUnit<T,m,n,IndexSum>::ParamSave(char *mem,unsigned int& size)
+{
+    Param* Head=reinterpret_cast<Param*>(mem);
+    char* tempmem=mem+sizeof(Param);
+    //step1:生成校验参数
+    if(size < sizeof(weight)+weight.getSize()+sizeof(bias)+bias.getSize()+sizeof(Param) || NULL == mem)
+    {
+        goto ERR;
+    }
+    //step2:导出,先导出数组管理对象，然后导出数组具体内容
+    memset(Head,0,sizeof(Param));
+    Head->InputNum = InputSize;
+    Head->OutputNum = OutputSize;
+
+    if(!weight.MemSave(tempmem))
+    {
+        goto ERR;
+    }
+    
+    if(!bias.MemSave(tempmem))
+    {
+        goto ERR;
+    }
+    //返回真实长度
+    size = tempmem-mem;
+
+    //计算内容摘要 
+    MD5_CTX md5;
+	MD5Init(&md5);         		
+	MD5Update(&md5,(unsigned char*)mem,size);
+	MD5Final(&md5,Head->Digest);        
+    
+    return true; 
+ERR:
+    LOG_ERR("ParamSave failed,need more space!");
+    size = sizeof(weight)+weight.getSize()+sizeof(bias)+bias.getSize()+sizeof(Param);
+    return false;
+}
+
+//单元前向计算
 template <class T,int m,int n,int IndexSum>
 Array<T> NolinearUnit<T,m,n,IndexSum>::UnitFront(const Array<T>& input)
 {
@@ -346,6 +415,7 @@ Array<T> NolinearUnit<T,m,n,IndexSum>::UnitFront(const Array<T>& input)
     return rc; 
 }
 
+//单元反向计算
 template <class T,int m,int n,int IndexSum>
 bool NolinearUnit<T,m,n,IndexSum>::UnitBack(Array<T>* Nextδ,Array<T>& NextWeight,unsigned int num)
 {
@@ -406,6 +476,8 @@ class FCLNet{
         ~FCLNet();
         //增加层 
         bool Addlayer(BaseUnit<M>* newLayer,int index=0);
+        //网络包含层数
+        unsigned int getLayerNum();
         //前向传播
         Array<M> run(Array<M>& indata);
         //反向传播,模版成员函数
@@ -461,6 +533,14 @@ bool FCLNet<M>::Addlayer(BaseUnit<M>* newLayer,int index)
 
     return true;
 }
+    
+//返回总层数
+template<class M>
+unsigned int FCLNet<M>::getLayerNum()
+{
+    return layerVector.size();
+}
+
 //输入数据，做网络计算,返回最后一个计算数组
 template<class M>
 Array<M> FCLNet<M>::run(Array<M>& indata)
