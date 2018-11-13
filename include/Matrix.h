@@ -215,6 +215,7 @@ class Array{
         Array<M>& diag(const M Value);
         Array<M>& clear();
         bool MemSave(char*& mem);
+        static Array<M> MemOut(char*& mem);
         //矩阵打印
         void show();
 };
@@ -1145,6 +1146,21 @@ M Array<M>::squareSum()
         }
     }
     return sum;
+}
+//数组导出
+template<class M>
+Array<M> Array<M>::MemOut(char*& mem)
+{
+    Array<M>* head=reinterpret_cast<Array<M>*>(mem);
+    if(NULL == mem)
+    {
+        Array<M> Null(0,0);
+        LOG_ERR("Array out failed! mem is NULL");
+        return Null;
+    }
+    //自增
+    mem+=head->spaceSize+sizeof(Array<M>);
+    return *head;
 }
 //数组保存
 template<class M>

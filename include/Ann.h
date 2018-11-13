@@ -244,7 +244,7 @@ class BaseUnit{
         //单元参数导入方法
         virtual bool ParamInstall(char *mem)=0;
         //单元参数导出方法
-        virtual bool ParamSave(char *mem,unsigned int& size)=0;
+        virtual bool ParamSave(char *&mem,unsigned int& size)=0;
 };
 
 //训练的根本是根据误差项对w的梯度，对w进行调整
@@ -276,10 +276,11 @@ class NolinearUnit:public BaseUnit<T>{
 
         //导入导出结构体
         typedef struct{
-            int InputNum;
-            int OutputNum; 
             //md5摘要
             unsigned char Digest[16];
+            unsigned int dataType;
+            //长度
+            unsigned int memSize;
         }Param;
     public:
         NolinearUnit(ActiveFun<T> *fun,int M=m,int N=n);
@@ -292,7 +293,7 @@ class NolinearUnit:public BaseUnit<T>{
         //参数导入
         bool ParamInstall(char *mem);
         //参数导出
-        bool ParamSave(char *mem,unsigned int& size);
+        bool ParamSave(char *&mem,unsigned int& size);
         //前向计算
         Array<T> UnitFront(const Array<T>& input);
         //反响计算
@@ -355,17 +356,39 @@ template <class T,int m,int n,int IndexSum>
 bool NolinearUnit<T,m,n,IndexSum>::ParamInstall(char *mem)
 {
     //step1:校验
-    //
+    Param* Head=reinterpret_cast<Param*>(mem);
+    char* dataMem=mem+sizeof(Param);
+
+    unsigned char tempMD5[16]={0};
+    unsigned int tempdataType = Head->dataType;
+
+    //设置当前的类型
+    Head->dataType = sizeof(T);
+    //计算内容摘要 
+    MD5_CTX md5;
+	MD5Init(&md5);         		
+	MD5Update(&md5,(unsigned char*)mem,Head->memSize);
+	MD5Final(&md5,tempMD5);
+
+    if(0 != memcmp(tempMD5,Head->Digest,16))
+    {
+        LOG_ERR("Param install failed!");
+        Head->dataType = tempdataType;
+        return false;
+    }
     //step2:导入
+    weight = Array<T>::MemOut(dataMem);  
+    bias = Array<T>::MemOut(dataMem);
+
     return true;
 }
 
 //参数导出
 template <class T,int m,int n,int IndexSum>
-bool NolinearUnit<T,m,n,IndexSum>::ParamSave(char *mem,unsigned int& size)
+bool NolinearUnit<T,m,n,IndexSum>::ParamSave(char *&mem,unsigned int& size)
 {
     Param* Head=reinterpret_cast<Param*>(mem);
-    char* tempmem=mem+sizeof(Param);
+    char* dataMem=mem+sizeof(Param);
     //step1:生成校验参数
     if(size < sizeof(weight)+weight.getSize()+sizeof(bias)+bias.getSize()+sizeof(Param) || NULL == mem)
     {
@@ -373,27 +396,29 @@ bool NolinearUnit<T,m,n,IndexSum>::ParamSave(char *mem,unsigned int& size)
     }
     //step2:导出,先导出数组管理对象，然后导出数组具体内容
     memset(Head,0,sizeof(Param));
-    Head->InputNum = InputSize;
-    Head->OutputNum = OutputSize;
 
-    if(!weight.MemSave(tempmem))
+    if(!weight.MemSave(dataMem))
     {
         goto ERR;
     }
     
-    if(!bias.MemSave(tempmem))
+    if(!bias.MemSave(dataMem))
     {
         goto ERR;
     }
-    //返回真实长度
-    size = tempmem-mem;
+    //MD5校验,不包括头部
+    Head->memSize = dataMem-mem;
+    Head->dataType = sizeof(T);
 
-    //计算内容摘要 
+    //计算内容摘要,不包括MD5校验字段
     MD5_CTX md5;
 	MD5Init(&md5);         		
-	MD5Update(&md5,(unsigned char*)mem,size);
+	MD5Update(&md5,(unsigned char*)mem+16,Head->memSize-16);
 	MD5Final(&md5,Head->Digest);        
-    
+   
+    //返回长度,更新内存地址
+    size = Head->memSize;
+    mem += size;
     return true; 
 ERR:
     LOG_ERR("ParamSave failed,need more space!");
