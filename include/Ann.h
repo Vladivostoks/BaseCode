@@ -225,12 +225,22 @@ Array<T> SquareLoss<T>::back(Array<T>&& array,Array<T>&& result)
 }
 
 /*********************************基本单元**********************************/
+#define RESINFO_LENTH   32
 //基本单元抽象
 template <class T>
 class BaseUnit{
     protected: 
         //层属性
         std::string property;
+        //导入导出结构体
+        typedef struct{
+            //md5摘要
+            unsigned char Digest[16];
+            //长度
+            unsigned int memSize;
+            //附加信息
+            unsigned char resInfo[RESINFO_LENTH];
+        }Param;
     public:
         BaseUnit(){};
         BaseUnit(const char* name):property(name){};
@@ -242,7 +252,7 @@ class BaseUnit{
         virtual Array<T> UnitFront(const Array<T>& input)=0;
         virtual bool UnitBack(Array<T>* Nextδ,Array<T>& NextWeight,unsigned int num=1)=0;
         //单元参数导入方法
-        virtual bool ParamInstall(char *mem)=0;
+        virtual bool ParamInstall(char *&mem)=0;
         //单元参数导出方法
         virtual bool ParamSave(char *&mem,unsigned int& size)=0;
 };
@@ -273,15 +283,7 @@ class NolinearUnit:public BaseUnit<T>{
         ActiveFun<T> *Active;
         //单元初始化函数
         bool ParamInit(Array<T>& value);
-
-        //导入导出结构体
-        typedef struct{
-            //md5摘要
-            unsigned char Digest[16];
-            unsigned int dataType;
-            //长度
-            unsigned int memSize;
-        }Param;
+        
     public:
         NolinearUnit(ActiveFun<T> *fun,int M=m,int N=n);
         ~NolinearUnit();
@@ -291,7 +293,7 @@ class NolinearUnit:public BaseUnit<T>{
         Array<T> getw() const {return weight;};
         Array<T> getbias() const {return bias;};
         //参数导入
-        bool ParamInstall(char *mem);
+        bool ParamInstall(char *&mem);
         //参数导出
         bool ParamSave(char *&mem,unsigned int& size);
         //前向计算
@@ -351,35 +353,44 @@ bool NolinearUnit<T,m,n,IndexSum>::ParamInit(Array<T>& value)
     return true;
 }
 
-//#TODO 参数导入
+//参数导入
 template <class T,int m,int n,int IndexSum>
-bool NolinearUnit<T,m,n,IndexSum>::ParamInstall(char *mem)
+bool NolinearUnit<T,m,n,IndexSum>::ParamInstall(char *&mem)
 {
     //step1:校验
-    Param* Head=reinterpret_cast<Param*>(mem);
-    char* dataMem=mem+sizeof(Param);
+    typename BaseUnit<T>::Param* Head=reinterpret_cast<typename BaseUnit<T>::Param*>(mem);
+    char* dataMem=mem+sizeof(typename BaseUnit<T>::Param);
+    unsigned int index = 0;
 
-    unsigned char tempMD5[16]={0};
-    unsigned int tempdataType = Head->dataType;
-
+    typename BaseUnit<T>::Param HeadBk;
+    //取之前数据
+    memset(&HeadBk,0,sizeof(typename BaseUnit<T>::Param));
+    memcpy(&HeadBk,Head,sizeof(typename BaseUnit<T>::Param));
     //设置当前的类型
-    Head->dataType = sizeof(T);
+    memset(Head->resInfo,0,RESINFO_LENTH);
+
+    memcpy(&Head->resInfo[index],&InputSize,sizeof(InputSize));
+    index += sizeof(InputSize);
+    memcpy(&Head->resInfo[index],&OutputSize,sizeof(OutputSize));
+    index += sizeof(OutputSize);
+    Head->resInfo[index] = sizeof(T);
     //计算内容摘要 
     MD5_CTX md5;
 	MD5Init(&md5);         		
-	MD5Update(&md5,(unsigned char*)mem,Head->memSize);
-	MD5Final(&md5,tempMD5);
+	MD5Update(&md5,(unsigned char*)mem+16,Head->memSize-16);
+	MD5Final(&md5,Head->Digest);
 
-    if(0 != memcmp(tempMD5,Head->Digest,16))
+    if(0 != memcmp(HeadBk.Digest,Head->Digest,16))
     {
         LOG_ERR("Param install failed!");
-        Head->dataType = tempdataType;
+        memcpy(Head,&HeadBk,sizeof(typename  BaseUnit<T>::Param));
         return false;
     }
     //step2:导入
     weight = Array<T>::MemOut(dataMem);  
     bias = Array<T>::MemOut(dataMem);
 
+    mem += Head->memSize;
     return true;
 }
 
@@ -387,30 +398,39 @@ bool NolinearUnit<T,m,n,IndexSum>::ParamInstall(char *mem)
 template <class T,int m,int n,int IndexSum>
 bool NolinearUnit<T,m,n,IndexSum>::ParamSave(char *&mem,unsigned int& size)
 {
-    Param* Head=reinterpret_cast<Param*>(mem);
-    char* dataMem=mem+sizeof(Param);
+    typename BaseUnit<T>::Param* Head=reinterpret_cast<typename BaseUnit<T>::Param*>(mem);
+    char* dataMem=mem+sizeof(typename BaseUnit<T>::Param);
+    unsigned int index = 0;
     //step1:生成校验参数
-    if(size < sizeof(weight)+weight.getSize()+sizeof(bias)+bias.getSize()+sizeof(Param) || NULL == mem)
+    if((size < sizeof(weight)+weight.getSize()+sizeof(bias)+bias.getSize()+sizeof(typename BaseUnit<T>::Param)) || NULL == mem)
     {
+        LOG_ERR("ParamSave failed,need more space! input "<<size<<" Byte except=> "<<
+                (sizeof(weight)+weight.getSize()+sizeof(bias)+bias.getSize()+sizeof(typename BaseUnit<T>::Param))<<"Byte");
         goto ERR;
     }
     //step2:导出,先导出数组管理对象，然后导出数组具体内容
-    memset(Head,0,sizeof(Param));
+    memset(Head,0,sizeof(typename BaseUnit<T>::Param));
 
     if(!weight.MemSave(dataMem))
     {
+        LOG_ERR("weight output failed!");
         goto ERR;
     }
     
     if(!bias.MemSave(dataMem))
     {
+        LOG_ERR("bias output failed!");
         goto ERR;
     }
-    //MD5校验,不包括头部
+    //长度，包括头部
     Head->memSize = dataMem-mem;
-    Head->dataType = sizeof(T);
-
-    //计算内容摘要,不包括MD5校验字段
+    //填充单元额外信息
+    memcpy(&Head->resInfo[index],&InputSize,sizeof(InputSize));
+    index += sizeof(InputSize);
+    memcpy(&Head->resInfo[index],&OutputSize,sizeof(OutputSize));
+    index += sizeof(OutputSize);
+    Head->resInfo[index] = sizeof(T);
+    //MD5校验,不包括头部MD5校验结果
     MD5_CTX md5;
 	MD5Init(&md5);         		
 	MD5Update(&md5,(unsigned char*)mem+16,Head->memSize-16);
@@ -421,8 +441,7 @@ bool NolinearUnit<T,m,n,IndexSum>::ParamSave(char *&mem,unsigned int& size)
     mem += size;
     return true; 
 ERR:
-    LOG_ERR("ParamSave failed,need more space!");
-    size = sizeof(weight)+weight.getSize()+sizeof(bias)+bias.getSize()+sizeof(Param);
+    size = sizeof(weight)+weight.getSize()+sizeof(bias)+bias.getSize()+sizeof(typename BaseUnit<T>::Param);
     return false;
 }
 

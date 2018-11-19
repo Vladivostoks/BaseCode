@@ -42,7 +42,7 @@ bool Time::freshTime()
 int Time::GetITime()
 {
     freshTime();
-    return iTime.tv_sec;
+    return iTime.tv_sec*1000+iTime.tv_usec/1000;
 }
 /*返回为毫秒*/
 unsigned long Time::GetITime(std::string StrTime)
@@ -60,7 +60,7 @@ unsigned long Time::GetITime(std::string StrTime)
                                                             &temp.tv_usec);
     temp.tv_sec = mktime(&info);
     
-    return (temp.tv_sec*1000+temp.tv_usec);
+    return (temp.tv_sec*1000+temp.tv_usec/1000);
 }
 
 std::string Time::GetSTime()
