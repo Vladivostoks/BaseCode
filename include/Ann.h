@@ -202,7 +202,6 @@ T SquareLoss<T>::back(T value,T result)
 {
     return -(result-value);
 }
-
 template<class T>
 Array<T> SquareLoss<T>::back(Array<T>& array,Array<T>& result)
 {
@@ -249,6 +248,7 @@ class BaseUnit{
         virtual unsigned int getOutSize() const=0;
         virtual Array<T> getw() const =0;
         virtual Array<T> getbias() const =0;
+        virtual Array<T> getΔweight(int num) const =0;
         virtual Array<T> UnitFront(const Array<T>& input)=0;
         virtual bool UnitBack(Array<T>* Nextδ,Array<T>& NextWeight,unsigned int num=1)=0;
         //单元参数导入方法
@@ -267,10 +267,6 @@ class NolinearUnit:public BaseUnit<T>{
         const int InputSize;
         //单元输出个数
         const int OutputSize;
-        //单元权重,m*n矩阵,代表n个单元,每个对m个输入的权值
-        Array<T>  weight;
-        //单元偏置,1*n矩阵，表示n个单元
-        Array<T>  bias;
         //当前缓存序号
         unsigned int Index;
         //单元激活函数输入,1*n个单元
@@ -285,6 +281,11 @@ class NolinearUnit:public BaseUnit<T>{
         bool ParamInit(Array<T>& value);
         
     public:
+        //单元权重,m*n矩阵,代表n个单元,每个对m个输入的权值
+        Array<T>  weight;
+        //单元偏置,1*n矩阵，表示n个单元
+        Array<T>  bias;
+
         NolinearUnit(ActiveFun<T> *fun,int M=m,int N=n);
         ~NolinearUnit();
 
@@ -292,6 +293,8 @@ class NolinearUnit:public BaseUnit<T>{
         unsigned int getOutSize() const {return OutputSize;};
         Array<T> getw() const {return weight;};
         Array<T> getbias() const {return bias;};
+        //当前梯度导出
+        Array<T> getΔweight(int num) const;
         //参数导入
         bool ParamInstall(char *&mem);
         //参数导出
@@ -306,13 +309,13 @@ template <class T,int m,int n,int IndexSum>
 NolinearUnit<T,m,n,IndexSum>::NolinearUnit(ActiveFun<T> *fun,int M,int N):BaseUnit<T>("NolinearUnit"),
                                                             InputSize(M),
                                                             OutputSize(N),
-                                                            weight(M,N,0),
-                                                            bias(1,N,0),
                                                             Index(0),
                                                             Out(NULL),
                                                             δ(NULL),
                                                             InputValue(NULL),
-                                                            Active(fun)
+                                                            Active(fun),
+                                                            weight(M,N,0),
+                                                            bias(1,N,0)
 {
     //初始化单元权重和状态
     ParamInit(weight);
@@ -343,7 +346,26 @@ NolinearUnit<T,m,n,IndexSum>::~NolinearUnit()
         delete Active;
     }
 }
+//导出最近n个样本的计算梯度
+template <class T,int m,int n,int IndexSum>
+Array<T> NolinearUnit<T,m,n,IndexSum>::getΔweight(int num) const
+{
+    //从最后一个开始,向前循环
+    Array<double> retA=weight;
+    retA.clear();
 
+    for(int i=Index-1,j=0;j<num;j++)
+    {
+        i=i<0?i+IndexSum:i;
+        //导出最近n个样本计算的w梯度
+        retA = retA+Array<T>::dot(InputValue[i].T(),δ[i]);
+        InputValue[i].T();
+        //循环
+        i--;
+    }
+
+    return retA;
+}
 //确认矩阵初始化的值
 template <class T,int m,int n,int IndexSum>
 bool NolinearUnit<T,m,n,IndexSum>::ParamInit(Array<T>& value)

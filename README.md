@@ -15,6 +15,9 @@ this is ANN BaseCode for myself to learn about **ANN**
 	|-Ann.cpp（about Ann code）	
 	|-General.cpp	
 	|-sysTool.cpp
+|-pyAPI
+|-var
+|-view
 ~~~
 
 ### Brief
@@ -36,7 +39,9 @@ in **src** director is project srouce file
             include some Global obj
         sysTool.cpp:
             include sysTool source code like timestamp
-
+in **pyAPI** director of pyAPI src code
+in **var** save file code using
+in **view** python Code for code Visual
 ## Makefile
 
 use **make** in project root dir to build aim

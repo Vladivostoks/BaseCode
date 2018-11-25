@@ -22,16 +22,22 @@
 #define OUTMEMLEN 1024
 //保存输出参数文件名称
 #define PARAMFILE "./var/paramfile.bin"
+//梯度检查调整值
+#define Δ 0.000000000001
+//梯度检查输入个数
+#define NUM 3
 
 enum Type{
     ArrayTest=0,
-    FCLNetTest,
+    FCLNetTrain,
+    GradientCheck,
     MAXType
 };
 
 
 bool FCLNetTestFunc();
 bool ArrayTestFunc();
+bool GradientCheckFun();
 
 int main(int argc,char* argv[])
 {
@@ -41,7 +47,8 @@ int main(int argc,char* argv[])
         do{
             printf("Illigal Test Type,please choose a unit of test:\n");
             printf("                                0 Array Test\n");
-            printf("                                1 FCLNet Test\n");
+            printf("                                1 FCLNet Train Test\n");
+            printf("                                2 Gradient Check\n");
             std::cin>>type;
         }while(type>MAXType || type < 0);
     }
@@ -55,12 +62,14 @@ int main(int argc,char* argv[])
             ArrayTestFunc();
             break;
         }
-
-        case FCLNetTest:{
+        case FCLNetTrain:{
             FCLNetTestFunc();
             break;
         }
-
+        case GradientCheck:{
+            GradientCheckFun();
+            break;
+        }
         default:{
             LOG_INFO("Please choose a test type");
         }
@@ -191,7 +200,7 @@ bool FCLNetTestFunc()
         LOG_INFO("["<<i<<"]["<<i*1.0/TRAIN*100<<"%]Loss Value "<<
             testNet.train(Input,Result,lossFun,4));
         //#TODO 输出训练的loss中间结果到文件，后续python做可视化
-        
+        //后面做pythonAPI后直接在python实现
     }
     unsigned int endTime = DBGTime.GetITime();
     std::cout<<"===========RESULT used "<<endTime-startTime<<"ms==========="<<std::endl;
@@ -245,7 +254,7 @@ bool FCLNetTestFunc()
         close(fd);
         fd = -1;
     }
-    std::cout<<"===================================="<<std::endl;
+    std::cout<<"==============NEW NET================="<<std::endl;
     /*参数导入*/ 
     //构建新网络
     FCLNet<double> testNet2;
@@ -279,16 +288,128 @@ bool FCLNetTestFunc()
         testNet2.run(Input[i]).show();
     }
     std::cout<<"================END==================="<<std::endl;
-    /*#TODO 网络参数调整做梯度检查*/
+    
+    return true;
+}
+
+bool GradientCheckFun()
+{   
+    /*参数导入*/ 
+    double resultA[]={0};
+    double inputA[]={0,0};
+
+    double resultB[]={1};
+    double inputB[]={0,1};
+
+    double resultC[]={1};
+    double inputC[]={1,0};
+
+    double resultD[]={0};
+    double inputD[]={1,1};
+
+    Array<double>Input[]={Array<double>(1,2,inputA,2),
+                          Array<double>(1,2,inputB,2),
+                          Array<double>(1,2,inputC,2),
+                          Array<double>(1,2,inputD,2)};
+
+    Array<double>Result[]={Array<double>(1,1,resultA,1),
+                           Array<double>(1,1,resultB,1),
+                           Array<double>(1,1,resultC,1),
+                           Array<double>(1,1,resultD,1)};
+    SquareLoss<double> lossFun;
+    //构建新网络
+    FCLNet<double> testNet2;
+    NolinearUnit<double,2,3,4>* layer1 = NULL;
+    NolinearUnit<double,3,1,4>* layer2 = NULL;
+    //std::unique_ptr<NolinearUnit<double,2,3,4>> layer1(new NolinearUnit<double,2,3,4>(new SigmoidActivator<double>()));
+    //std::unique_ptr<NolinearUnit<double,3,1,4>> layer2(new NolinearUnit<double,3,1,4>(new SigmoidActivator<double>()));
+    testNet2.Addlayer(layer1 = new NolinearUnit<double,2,3,4>(new SigmoidActivator<double>()));
+    testNet2.Addlayer(layer2 = new NolinearUnit<double,3,1,4>(new SigmoidActivator<double>()));
+
+    /*随机梯度下降单样本输入做网络参数调整做梯度检查*/
+    /*w矩阵重构*/
     std::cout<<"============GRADIENT CHECK============"<<std::endl;
+    for(int j=0;j<testNet2.getLayerNum();j++)
+    {
+        //STEP1:保存当前weight值，并且进行一次反向计算 
+        //只能改其中一支的值，因为按照微分计算出的倒数只是一个值
+        //需要手动指定层的子类,获取子类独有成员
+        char* paramMem1 = NULL;
+        char* paramMem2 = NULL;
+        char* offset1 = NULL;
+        char* offset2 = NULL;
+    
+        paramMem1 = (char*)malloc(1024);
+        paramMem2 = (char*)malloc(1024);
+
+        offset1 = paramMem1;
+        offset2 = paramMem2;   
+
+        if(0==j)
+        {
+            unsigned int left = 1024;
+            Array<double>& Weight = dynamic_cast<NolinearUnit<double,2,3,4>*>(testNet2[j])->weight;
+            Weight[0][0] = Weight[0][0]+Δ;
+            testNet2[j]->ParamSave(offset1,left);
+
+            left=1024;
+            Weight[0][0] = Weight[0][0]-2*Δ;
+            testNet2[j]->ParamSave(offset2,left);
+            //还原
+            Weight[0][0] = Weight[0][0]+Δ;
+        }
+        else if(1==j)
+        {
+            unsigned int left = 1024;
+            Array<double>& Weight = dynamic_cast<NolinearUnit<double,3,1,4>*>(testNet2[j])->weight;
+            Weight[0][0] = Weight[0][0]+Δ;
+            testNet2[j]->ParamSave(offset1,left);
+
+            left=1024;
+            Weight[0][0] = Weight[0][0]-2*Δ;
+            testNet2[j]->ParamSave(offset2,left);
+            //还原
+            Weight[0][0] = Weight[0][0]+Δ;
+        }
+        else
+        {
+            LOG_ERR("break");
+            break;
+        }
+        
+        double loss1=0;
+        double loss2=0;
+        double Δweight=0;
+        double ΔNet=0;
+
+        offset1 = paramMem1;
+        offset2 = paramMem2;
+
+        testNet2.train(Input,Result,lossFun,NUM);
+        //STEP2:使用w1和w2下同样本输入的loss值计算梯度
+        testNet2[j]->ParamInstall(offset1);
+        for(int i=0;i<NUM;i++)
+        {
+            loss1 = loss1+lossFun.front(testNet2.run(Input[i]),Result[i]);
+        }
+
+        testNet2[j]->ParamInstall(offset2);
+        for(int i=0;i<NUM;i++)
+        {
+            loss2 = loss2+lossFun.front(testNet2.run(Input[i]),Result[i]);
+        }
+
+        Δweight = (loss1-loss2)/(2*Δ);
+        //STEP3:对比反向计算和微分计算出的梯度
+        ΔNet = (testNet2[j]->getΔweight(NUM))[0][0];
+        LOG_INFO("Δweight=>["<<Δweight<<"]ΔNet=>["<<ΔNet<<"] diff=>["<<Δweight-ΔNet<<"]");
+    }
     std::cout<<"================END==================="<<std::endl;
-    /*#TODO 二维全局范围的数据可视化*/
+    /*#TODO 借助python实现二维全局范围的数据可视化,后面做pythonAPI后直接在python实现*/
     std::cout<<"===============VISUAL================="<<std::endl;
     std::cout<<"================END==================="<<std::endl;
     return true;
 }
-
-
 
 
 
