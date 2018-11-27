@@ -156,6 +156,16 @@ bool ArrayTestFunc()
         std::cout<<"===================================="<<std::endl;
     }
     std::cout<<"====================END==================="<<std::endl;
+    std::cout<<"======Test 8 BIG Array Cache hit&miss Test====="<<std::endl;
+    Array<double> L(2048,2048,1.5);
+    Array<double> M(2048,2048,3.1);
+    LOG_INFO("start Cache miss");
+    Array<double>::dot(L,M);
+    LOG_INFO("end Cache miss");
+    LOG_INFO("start Cache hit");
+    Array<double>::dot(L,M.T());
+    LOG_INFO("end Cache hit");
+    std::cout<<"====================END==================="<<std::endl;
     return true;
 }
 
@@ -212,7 +222,6 @@ bool FCLNetTestFunc()
     std::cout<<"================END==================="<<std::endl;
     /*网络参数导入导出测试*/
     std::cout<<"=====PARAM OUTPUT&INSTALL TEST========"<<std::endl;
-    unsigned int left = OUTMEMLEN;
     unsigned int used = 0;
     char* paramMem = (char*)malloc(OUTMEMLEN);
     char* offset = paramMem;
@@ -221,16 +230,10 @@ bool FCLNetTestFunc()
     //依次导出2层参数
     for(int i=0;i<testNet.getLayerNum();i++)
     {
-        left = OUTMEMLEN - used;
-        if(!testNet[i]->ParamSave(offset,left))
+        if((used = testNet[i]->ParamSave(offset,OUTMEMLEN-used))<0)
         {
             LOG_ERR("["<<i<<"]Output Net Param failed!");
             break;
-        }
-        else
-        {
-            //left 存储当前使用的长度
-            used += left; 
         }
     }
     
@@ -334,66 +337,29 @@ bool GradientCheckFun()
         //STEP1:保存当前weight值，并且进行一次反向计算 
         //只能改其中一支的值，因为按照微分计算出的倒数只是一个值
         //需要手动指定层的子类,获取子类独有成员
-        char* paramMem1 = NULL;
-        char* paramMem2 = NULL;
-        char* offset1 = NULL;
-        char* offset2 = NULL;
+        char* paramMem = NULL;
+        char* offset = NULL;
     
-        paramMem1 = (char*)malloc(1024);
-        paramMem2 = (char*)malloc(1024);
+        paramMem = (char*)malloc(1024);
+        offset = paramMem;
 
-        offset1 = paramMem1;
-        offset2 = paramMem2;   
-
-        if(0==j)
-        {
-            unsigned int left = 1024;
-            Array<double>& Weight = dynamic_cast<NolinearUnit<double,2,3,4>*>(testNet2[j])->weight;
-            Weight[0][0] = Weight[0][0]+Δ;
-            testNet2[j]->ParamSave(offset1,left);
-
-            left=1024;
-            Weight[0][0] = Weight[0][0]-2*Δ;
-            testNet2[j]->ParamSave(offset2,left);
-            //还原
-            Weight[0][0] = Weight[0][0]+Δ;
-        }
-        else if(1==j)
-        {
-            unsigned int left = 1024;
-            Array<double>& Weight = dynamic_cast<NolinearUnit<double,3,1,4>*>(testNet2[j])->weight;
-            Weight[0][0] = Weight[0][0]+Δ;
-            testNet2[j]->ParamSave(offset1,left);
-
-            left=1024;
-            Weight[0][0] = Weight[0][0]-2*Δ;
-            testNet2[j]->ParamSave(offset2,left);
-            //还原
-            Weight[0][0] = Weight[0][0]+Δ;
-        }
-        else
-        {
-            LOG_ERR("break");
-            break;
-        }
-        
+        unsigned int left = 1024;
+        testNet2[j]->CheckSave(offset,left,Δ);
         double loss1=0;
         double loss2=0;
         double Δweight=0;
         double ΔNet=0;
 
-        offset1 = paramMem1;
-        offset2 = paramMem2;
-
         testNet2.train(Input,Result,lossFun,NUM);
         //STEP2:使用w1和w2下同样本输入的loss值计算梯度
-        testNet2[j]->ParamInstall(offset1);
+        offset = paramMem;
+        testNet2[j]->ParamInstall(offset);
         for(int i=0;i<NUM;i++)
         {
             loss1 = loss1+lossFun.front(testNet2.run(Input[i]),Result[i]);
         }
 
-        testNet2[j]->ParamInstall(offset2);
+        testNet2[j]->ParamInstall(offset);
         for(int i=0;i<NUM;i++)
         {
             loss2 = loss2+lossFun.front(testNet2.run(Input[i]),Result[i]);

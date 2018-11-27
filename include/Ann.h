@@ -254,7 +254,9 @@ class BaseUnit{
         //单元参数导入方法
         virtual bool ParamInstall(char *&mem)=0;
         //单元参数导出方法
-        virtual bool ParamSave(char *&mem,unsigned int& size)=0;
+        virtual unsigned int ParamSave(char *&mem,unsigned int size)=0;
+        //单元梯度检查参数倒出方法
+        virtual bool CheckSave(char *&mem,unsigned int& size,T step)=0;
 };
 
 //训练的根本是根据误差项对w的梯度，对w进行调整
@@ -298,7 +300,9 @@ class NolinearUnit:public BaseUnit<T>{
         //参数导入
         bool ParamInstall(char *&mem);
         //参数导出
-        bool ParamSave(char *&mem,unsigned int& size);
+        unsigned int ParamSave(char *&mem,unsigned int size);
+        //梯度检查参数倒出
+        bool CheckSave(char *&mem,unsigned int& size,T step);
         //前向计算
         Array<T> UnitFront(const Array<T>& input);
         //反响计算
@@ -418,7 +422,7 @@ bool NolinearUnit<T,m,n,IndexSum>::ParamInstall(char *&mem)
 
 //参数导出
 template <class T,int m,int n,int IndexSum>
-bool NolinearUnit<T,m,n,IndexSum>::ParamSave(char *&mem,unsigned int& size)
+unsigned int NolinearUnit<T,m,n,IndexSum>::ParamSave(char *&mem,unsigned int size)
 {
     typename BaseUnit<T>::Param* Head=reinterpret_cast<typename BaseUnit<T>::Param*>(mem);
     char* dataMem=mem+sizeof(typename BaseUnit<T>::Param);
@@ -461,12 +465,27 @@ bool NolinearUnit<T,m,n,IndexSum>::ParamSave(char *&mem,unsigned int& size)
     //返回长度,更新内存地址
     size = Head->memSize;
     mem += size;
-    return true; 
+    return size; 
 ERR:
     size = sizeof(weight)+weight.getSize()+sizeof(bias)+bias.getSize()+sizeof(typename BaseUnit<T>::Param);
-    return false;
+    return -1;
 }
 
+//梯度检查参数倒出
+template <class T,int m,int n,int IndexSum>
+bool NolinearUnit<T,m,n,IndexSum>::CheckSave(char *&mem,unsigned int& size,T step)
+{
+    Array<double> tempWeight = weight;
+    weight = tempWeight+step;
+    ParamSave(mem,size);   
+
+    weight = tempWeight-step;
+
+    ParamSave(mem,size);   
+    weight = tempWeight;
+
+    return true;
+}
 //单元前向计算
 template <class T,int m,int n,int IndexSum>
 Array<T> NolinearUnit<T,m,n,IndexSum>::UnitFront(const Array<T>& input)
