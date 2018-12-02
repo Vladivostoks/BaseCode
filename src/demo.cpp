@@ -23,9 +23,9 @@
 //保存输出参数文件名称
 #define PARAMFILE "./var/paramfile.bin"
 //梯度检查调整值
-#define Δ 0.000000000001
+#define Δ 0.0001
 //梯度检查输入个数
-#define NUM 3
+#define NUM 4
 
 enum Type{
     ArrayTest=0,
@@ -207,6 +207,7 @@ bool FCLNetTestFunc()
     /*Stochastic gradient 随机梯度*/
     for(int i=0;i<TRAIN;i++)
     {
+        //#TODO 解决1-3bug
         LOG_INFO("["<<i<<"]["<<i*1.0/TRAIN*100<<"%]Loss Value "<<
             testNet.train(Input,Result,lossFun,4));
         //#TODO 输出训练的loss中间结果到文件，后续python做可视化
@@ -224,27 +225,37 @@ bool FCLNetTestFunc()
     std::cout<<"=====PARAM OUTPUT&INSTALL TEST========"<<std::endl;
     unsigned int used = 0;
     char* paramMem = (char*)malloc(OUTMEMLEN);
-    char* offset = paramMem;
+    memset(paramMem,0,OUTMEMLEN);
     int fd=-1;
 
     //依次导出2层参数
+#if 0
     for(int i=0;i<testNet.getLayerNum();i++)
     {
-        if((used = testNet[i]->ParamSave(offset,OUTMEMLEN-used))<0)
+        int tempuse=0;
+        if((tempuse = testNet[i]->ParamSave(paramMem+used,OUTMEMLEN-used))<0)
         {
             LOG_ERR("["<<i<<"]Output Net Param failed!");
             break;
         }
+        else
+        {
+            used += tempuse;
+        }
     }
+#else
+    used = testNet.ParamSave(paramMem,OUTMEMLEN);
+    LOG_ERR("used "<<used);
+#endif
     
     fd = open(PARAMFILE,O_RDWR|O_CREAT,0600);
-    if((offset-paramMem) == write(fd,paramMem,offset-paramMem))
+    if(used == write(fd,paramMem,used))
     {
         LOG_INFO("Save Param successfully!");
     }
     else
     {
-        LOG_INFO("Save Param failed! err"<<errno);
+        LOG_INFO("Save Param failed! errno="<<errno);
     }
 
     if(paramMem)
@@ -265,26 +276,30 @@ bool FCLNetTestFunc()
     testNet2.Addlayer(new NolinearUnit<double,3,1,4>(new SigmoidActivator<double>()));
 
     fd = open(PARAMFILE,O_RDONLY|O_EXCL,0600);
-    paramMem = (char*)malloc(1024);
-    offset = paramMem;
+    paramMem = (char*)malloc(OUTMEMLEN);
+    memset(paramMem,0,OUTMEMLEN);
     //读取参数
-    if(read(fd,paramMem,1024)>0)
+    if(read(fd,paramMem,OUTMEMLEN)>0)
     {
         LOG_INFO("Read Param successfully!");
     }
     else
     {
-        LOG_INFO("Read Param failed!");
+        LOG_INFO("Read Param failed! errno="<<errno);
     }
-
+#if 0
+    char* offset = paramMem;
     for(int i=0;i<testNet2.getLayerNum();i++)
     {
         if(!testNet2[i]->ParamInstall(offset))
         {
-            LOG_ERR("Output Net Param failed!");
+            LOG_ERR("Install Net Param failed!");
             break;
         }
     }
+#else
+    testNet2.ParamInstall(paramMem);
+#endif
     /*新网络测试输入参数是否有效*/
     for(int i=0;i<4;i++)
     {
@@ -298,6 +313,7 @@ bool FCLNetTestFunc()
 bool GradientCheckFun()
 {   
     /*参数导入*/ 
+#if 0
     double resultA[]={0};
     double inputA[]={0,0};
 
@@ -309,7 +325,19 @@ bool GradientCheckFun()
 
     double resultD[]={0};
     double inputD[]={1,1};
+#else
+    double resultA[]={0};
+    double inputA[]={1,1};
 
+    double resultB[]={1};
+    double inputB[]={1,0};
+
+    double resultC[]={1};
+    double inputC[]={1,0};
+
+    double resultD[]={0};
+    double inputD[]={1,1};
+#endif
     Array<double>Input[]={Array<double>(1,2,inputA,2),
                           Array<double>(1,2,inputB,2),
                           Array<double>(1,2,inputC,2),
@@ -332,43 +360,54 @@ bool GradientCheckFun()
     /*随机梯度下降单样本输入做网络参数调整做梯度检查*/
     /*w矩阵重构*/
     std::cout<<"============GRADIENT CHECK============"<<std::endl;
+#if 0
     for(int j=0;j<testNet2.getLayerNum();j++)
+#else
+    for(int j=0;j<1;j++)
+#endif
     {
         //STEP1:保存当前weight值，并且进行一次反向计算 
         //只能改其中一支的值，因为按照微分计算出的倒数只是一个值
         //需要手动指定层的子类,获取子类独有成员
-        char* paramMem = NULL;
-        char* offset = NULL;
-    
-        paramMem = (char*)malloc(1024);
-        offset = paramMem;
-
-        unsigned int left = 1024;
-        testNet2[j]->CheckSave(offset,left,Δ);
+        char* paramMem1 = NULL;
+        char* paramMem2 = NULL;
         double loss1=0;
         double loss2=0;
-        double Δweight=0;
+#if 0
+        /*手动计算的梯度值*/
+        double ΔManual=0;
+        /*网络训练的梯度值*/
         double ΔNet=0;
+#endif
+
+        paramMem1 = (char*)malloc(OUTMEMLEN);
+        paramMem2 = (char*)malloc(OUTMEMLEN);
+
+        //需要将整个网络的参数导出
+        testNet2.CheckSave(paramMem1,OUTMEMLEN,Δ,j);
+        testNet2.CheckSave(paramMem2,OUTMEMLEN,-Δ,j);
 
         testNet2.train(Input,Result,lossFun,NUM);
         //STEP2:使用w1和w2下同样本输入的loss值计算梯度
-        offset = paramMem;
-        testNet2[j]->ParamInstall(offset);
+        testNet2.ParamInstall(paramMem1);
         for(int i=0;i<NUM;i++)
         {
             loss1 = loss1+lossFun.front(testNet2.run(Input[i]),Result[i]);
         }
 
-        testNet2[j]->ParamInstall(offset);
+        testNet2.ParamInstall(paramMem2);
         for(int i=0;i<NUM;i++)
         {
             loss2 = loss2+lossFun.front(testNet2.run(Input[i]),Result[i]);
         }
 
-        Δweight = (loss1-loss2)/(2*Δ);
+        double ΔManual = (loss1-loss2)/(2*Δ);
         //STEP3:对比反向计算和微分计算出的梯度
-        ΔNet = (testNet2[j]->getΔweight(NUM))[0][0];
-        LOG_INFO("Δweight=>["<<Δweight<<"]ΔNet=>["<<ΔNet<<"] diff=>["<<Δweight-ΔNet<<"]");
+        Array<double> ΔNet = (testNet2[j]->getΔweight(NUM));
+
+        LOG_INFO("Δweight=>["<<ΔManual<<"]");
+        ΔNet.show();
+        //LOG_INFO("Δweight=>["<<ΔManual<<"]ΔNet=>["<<ΔNet<<"] diff=>["<<ΔManual-ΔNet<<"]");
     }
     std::cout<<"================END==================="<<std::endl;
     /*#TODO 借助python实现二维全局范围的数据可视化,后面做pythonAPI后直接在python实现*/

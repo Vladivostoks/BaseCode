@@ -582,6 +582,7 @@ Array<M> Array<M>::dot(Array<M>& left,Array<M>& right)
     int j = right.getRow();
     Array<M> tempArray(i,j,0);
 
+    //#TODO 大尺寸矩阵需要调整内存，进行cache miss优化
     //矩阵点乘法
     if(left.getRow() != right.getLine())
     {
@@ -1151,13 +1152,13 @@ M Array<M>::squareSum()
 template<class M>
 Array<M> Array<M>::MemOut(char*& mem)
 {
-    Array<M>* head=reinterpret_cast<Array<M>*>(mem);
     if(NULL == mem)
     {
         Array<M> Null(0,0);
         LOG_ERR("Array out failed! mem is NULL");
         return Null;
     }
+    Array<M>* head=reinterpret_cast<Array<M>*>(mem);
     //自增
     mem+=head->spaceSize+sizeof(Array<M>);
     return *head;
@@ -1166,9 +1167,9 @@ Array<M> Array<M>::MemOut(char*& mem)
 template<class M>
 bool Array<M>::MemSave(char *&mem)
 {
-    Array<M>* head=reinterpret_cast<Array<M>*>(mem);
     if(NULL != mem)
     {
+        Array<M>* head=reinterpret_cast<Array<M>*>(mem);
         //复制管理部分
         memcpy(head,this,sizeof(Array<M>));
         //复制数据部分

@@ -254,9 +254,9 @@ class BaseUnit{
         //单元参数导入方法
         virtual bool ParamInstall(char *&mem)=0;
         //单元参数导出方法
-        virtual unsigned int ParamSave(char *&mem,unsigned int size)=0;
+        virtual unsigned int ParamSave(char *mem,unsigned int size)=0;
         //单元梯度检查参数倒出方法
-        virtual bool CheckSave(char *&mem,unsigned int& size,T step)=0;
+        virtual unsigned int CheckSave(char *mem,unsigned int size,T step)=0;
 };
 
 //训练的根本是根据误差项对w的梯度，对w进行调整
@@ -300,9 +300,9 @@ class NolinearUnit:public BaseUnit<T>{
         //参数导入
         bool ParamInstall(char *&mem);
         //参数导出
-        unsigned int ParamSave(char *&mem,unsigned int size);
+        unsigned int ParamSave(char *mem,unsigned int size);
         //梯度检查参数倒出
-        bool CheckSave(char *&mem,unsigned int& size,T step);
+        unsigned int CheckSave(char *mem,unsigned int size,T step);
         //前向计算
         Array<T> UnitFront(const Array<T>& input);
         //反响计算
@@ -422,12 +422,17 @@ bool NolinearUnit<T,m,n,IndexSum>::ParamInstall(char *&mem)
 
 //参数导出
 template <class T,int m,int n,int IndexSum>
-unsigned int NolinearUnit<T,m,n,IndexSum>::ParamSave(char *&mem,unsigned int size)
+unsigned int NolinearUnit<T,m,n,IndexSum>::ParamSave(char *mem,unsigned int size)
 {
     typename BaseUnit<T>::Param* Head=reinterpret_cast<typename BaseUnit<T>::Param*>(mem);
     char* dataMem=mem+sizeof(typename BaseUnit<T>::Param);
     unsigned int index = 0;
     //step1:生成校验参数
+    if(NULL == mem)
+    {
+        LOG_ERR("Param Sace mem is NULL");
+        goto ERR;
+    }
     if((size < sizeof(weight)+weight.getSize()+sizeof(bias)+bias.getSize()+sizeof(typename BaseUnit<T>::Param)) || NULL == mem)
     {
         LOG_ERR("ParamSave failed,need more space! input "<<size<<" Byte except=> "<<
@@ -464,7 +469,6 @@ unsigned int NolinearUnit<T,m,n,IndexSum>::ParamSave(char *&mem,unsigned int siz
    
     //返回长度,更新内存地址
     size = Head->memSize;
-    mem += size;
     return size; 
 ERR:
     size = sizeof(weight)+weight.getSize()+sizeof(bias)+bias.getSize()+sizeof(typename BaseUnit<T>::Param);
@@ -473,18 +477,16 @@ ERR:
 
 //梯度检查参数倒出
 template <class T,int m,int n,int IndexSum>
-bool NolinearUnit<T,m,n,IndexSum>::CheckSave(char *&mem,unsigned int& size,T step)
+unsigned int NolinearUnit<T,m,n,IndexSum>::CheckSave(char *mem,unsigned int size,T step)
 {
     Array<double> tempWeight = weight;
-    weight = tempWeight+step;
-    ParamSave(mem,size);   
-
-    weight = tempWeight-step;
-
-    ParamSave(mem,size);   
+    unsigned int ret = 0;
+    tempWeight[0][0] += step;
     weight = tempWeight;
-
-    return true;
+    ret = ParamSave(mem,size);   
+    //restore
+    weight = tempWeight;
+    return ret;
 }
 //单元前向计算
 template <class T,int m,int n,int IndexSum>
@@ -569,6 +571,12 @@ class FCLNet{
         M train(Array<M>* X,Array<M>* Y,LossFun<M>& lossFun,const unsigned int num=1,bool enable=true);
         //快速索引
         BaseUnit<M>* operator[](unsigned int index);
+        //梯度检查参数倒出
+        unsigned int CheckSave(char* mem,unsigned int size,M Δ,unsigned int index);
+        //普通参数倒出,返回值为倒出长度
+        unsigned int ParamSave(char* mem,unsigned int size);
+        //网络参数导入
+        bool ParamInstall(char* mem);
 };
 
 //网络层向量初始化
@@ -688,9 +696,102 @@ BaseUnit<M>* FCLNet<M>::operator[](unsigned int index)
     return  index>=layerVector.size()?NULL:layerVector[index]; 
 }
 
+/*按照Δ的步进，对index层进行参数微调后的导出*/
+template<class M>
+unsigned int FCLNet<M>::CheckSave(char* mem,unsigned int size,M Δ,unsigned int index)
+{
+    unsigned int used=0;
+    if(NULL == mem)
+    {
+        LOG_ERR("FCLNET Checkout mem is NULL");
+        return -1;
+    }
+
+    for(int i=0;i<layerVector.size();i++)
+    {
+        int tempuse=0;
+        if(i == index)
+        {
+            //导出检查参数
+            if((tempuse=layerVector[i]->CheckSave(mem+used,size-used,Δ))<0)
+            {
+                LOG_ERR("["<<i<<"]Check Output Net Param failed!");
+                return -1;
+            }
+            else
+            {
+                used += tempuse;
+            }
+        }
+        else
+        {
+            //导出正常参数 
+            if((tempuse=layerVector[i]->ParamSave(mem+used,size-used))<0)
+            {
+                LOG_ERR("["<<i<<"]Output Net Param failed!");
+                return -1;
+            }
+            else
+            {
+                used += tempuse;
+            }
+        }
+    }
+    return used;
+}
+template<class M>
+unsigned int FCLNet<M>::ParamSave(char* mem,unsigned int size)
+{
+    if(NULL == mem)
+    {
+        LOG_ERR("FCLNET ParamSave mem is NULL");
+        return -1;
+    }
+    unsigned int used = 0;
+    for(int i=0;i<layerVector.size();i++)
+    {
+        int tempuse=0;
+        if((tempuse = layerVector[i]->ParamSave(mem+used,size-used))<0)
+        {
+            LOG_ERR("["<<i<<"]Output Net Param failed!");
+            return -1;
+        }
+        else
+        {
+            used += tempuse;
+        }
+    }
+    return used;
+}
+
+/*网络参数导入*/
+template<class M>
+bool FCLNet<M>::ParamInstall(char* mem)
+{   
+    if(NULL == mem)
+    {
+        LOG_ERR("FCLNET ParamInstall mem is NULL");
+        return false;
+    }
+    for(int i=0;i<layerVector.size();i++)
+    {
+        if(!layerVector[i]->ParamInstall(mem))
+        {
+            LOG_ERR("["<<i<<"]Install Net Param failed!");
+            return false;
+        }
+    }
+    return true;
+}
 //2卷积网络组件：
 //A卷积单元
+template <class T,int m,int n,int IndexSum=1>
+class CovnUnit:public BaseUnit<T>{
+};
 //B池化单元
+template <class T,int m,int n,int IndexSum=1>
+class PoolUnit:public BaseUnit<T>{
+};
 //1-A全连接网络
 
 //3LTSM单元

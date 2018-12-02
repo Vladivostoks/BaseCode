@@ -34,7 +34,7 @@ OBJFILE += $(addprefix $(OBJPATH)/,$(filter %.o,$(patsubst %.c,%.o,$(notdir $(SR
 OBJFILE += $(addprefix $(OBJPATH)/,$(filter %.o,$(patsubst %.cpp,%.o,$(notdir $(SRCFILE)))))
 
 LIBFILE += 
-CFLAG += -Wall -O2
+CFLAG += -Wall -O2 -g
 CFLAG += -I ./include
 
 CPPFLAG += -Wall -O2 -std=c++11

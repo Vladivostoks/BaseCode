@@ -49,6 +49,8 @@ flags = [
 '-I',
 './include',
 '-I',
+'/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/include/python3.7m/',
+'-I',
 './src',
 #end
 #seems add follow will cause complete error
