@@ -207,7 +207,6 @@ bool FCLNetTestFunc()
     /*Stochastic gradient 随机梯度*/
     for(int i=0;i<TRAIN;i++)
     {
-        //#TODO 解决1-3bug
         LOG_INFO("["<<i<<"]["<<i*1.0/TRAIN*100<<"%]Loss Value "<<
             testNet.train(Input,Result,lossFun,4));
         //#TODO 输出训练的loss中间结果到文件，后续python做可视化

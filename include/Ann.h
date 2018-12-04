@@ -524,11 +524,11 @@ bool NolinearUnit<T,m,n,IndexSum>::UnitBack(Array<T>* Nextδ,Array<T>& NextWeigh
         num = IndexSum;
     }
     //从最后一个开始,向前循环
-    for(int i=Index-1,j=0;j<num;j++)
-    {
+    for(int i=Index-1,j=num-1;j>=0;j--)
+    {   
         i=i<0?i+IndexSum:i;
-        //δ存对应索引计算出的数组
-        δ[i] = Active->back(Out[i])*Array<T>::dot(Nextδ[i],NextWeight.T());
+        //δ存对应索引计算出的数组,i是从后往前算，
+        δ[i] = Active->back(Out[i])*Array<T>::dot(Nextδ[j],NextWeight.T());
         NextWeight.T();
         tempWeight = tempWeight+η*Array<T>::dot(InputValue[i].T(),δ[i]);
         InputValue[i].T();
@@ -664,7 +664,13 @@ M FCLNet<M>::train(Array<M>* X,Array<M>* Y,LossFun<M>& lossFun,const unsigned in
     //step 3:初始化输入矩阵
     tempw.diag(1);//W用1进行对角化
     //对矩阵Y每个元素执行func后，赋值给tempδ
-    Array<M>* tempδ = new Array<M>[num];
+    Array<M>* tempδ = NULL;
+    tempδ = new Array<M>[num];
+    if(NULL == tempδ)
+    {
+        LOG_ERR("apply tempδ failed!");
+        return -1;
+    }
     for(i=0;i<num;i++)
     {
         tempδ[i] = lossFun.back(run(X[i]),Y[i]);
@@ -675,6 +681,11 @@ M FCLNet<M>::train(Array<M>* X,Array<M>* Y,LossFun<M>& lossFun,const unsigned in
         //Now tempw&tempw update in UnitBack
         layerVector[i]->UnitBack(tempδ,tempw,num);
     }
+    if(NULL != tempδ)
+    {
+        delete[] tempδ;
+    }
+
     //返回本次训练后的当前的loss值
     if(enable)
     {
