@@ -11,6 +11,8 @@ PREFIX ?= .
 
 CC=clang
 CCP=clang++
+#CC=/usr/local/opt/gcc/bin/gcc-8
+#CCP=/usr/local/opt/gcc/bin/g++-8
 LD=clang
 SRTIP=strip
 

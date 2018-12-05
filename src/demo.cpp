@@ -17,13 +17,13 @@
 #include "General.h"
 
 //训练次数
-#define TRAIN   100000
+#define TRAIN   1000//100000
 //导出的预设内存大小
 #define OUTMEMLEN 1024
 //保存输出参数文件名称
 #define PARAMFILE "./var/paramfile.bin"
 //梯度检查调整值
-#define Δ 0.0001
+#define Δ 0.00001
 //梯度检查输入个数
 #define NUM 4
 
@@ -31,6 +31,7 @@ enum Type{
     ArrayTest=0,
     FCLNetTrain,
     GradientCheck,
+    TempCheck,
     MAXType
 };
 
@@ -38,6 +39,7 @@ enum Type{
 bool FCLNetTestFunc();
 bool ArrayTestFunc();
 bool GradientCheckFun();
+bool tempTest();
 
 int main(int argc,char* argv[])
 {
@@ -68,6 +70,10 @@ int main(int argc,char* argv[])
         }
         case GradientCheck:{
             GradientCheckFun();
+            break;
+        }
+        case TempCheck:{
+            tempTest();
             break;
         }
         default:{
@@ -208,7 +214,15 @@ bool FCLNetTestFunc()
     for(int i=0;i<TRAIN;i++)
     {
         LOG_INFO("["<<i<<"]["<<i*1.0/TRAIN*100<<"%]Loss Value "<<
-            testNet.train(Input,Result,lossFun,4));
+            testNet.train(Input,Result,lossFun,NUM));
+        //打印梯度
+#if 1
+        for(int j=0;j<2;j++)
+        {
+            Array<double> ΔNet = (testNet[j]->getΔweight(NUM));
+            //ΔNet.show();
+        }
+#endif
         //#TODO 输出训练的loss中间结果到文件，后续python做可视化
         //后面做pythonAPI后直接在python实现
     }
@@ -227,25 +241,8 @@ bool FCLNetTestFunc()
     memset(paramMem,0,OUTMEMLEN);
     int fd=-1;
 
-    //依次导出2层参数
-#if 0
-    for(int i=0;i<testNet.getLayerNum();i++)
-    {
-        int tempuse=0;
-        if((tempuse = testNet[i]->ParamSave(paramMem+used,OUTMEMLEN-used))<0)
-        {
-            LOG_ERR("["<<i<<"]Output Net Param failed!");
-            break;
-        }
-        else
-        {
-            used += tempuse;
-        }
-    }
-#else
     used = testNet.ParamSave(paramMem,OUTMEMLEN);
     LOG_ERR("used "<<used);
-#endif
     
     fd = open(PARAMFILE,O_RDWR|O_CREAT,0600);
     if(used == write(fd,paramMem,used))
@@ -286,33 +283,25 @@ bool FCLNetTestFunc()
     {
         LOG_INFO("Read Param failed! errno="<<errno);
     }
-#if 0
-    char* offset = paramMem;
-    for(int i=0;i<testNet2.getLayerNum();i++)
-    {
-        if(!testNet2[i]->ParamInstall(offset))
-        {
-            LOG_ERR("Install Net Param failed!");
-            break;
-        }
-    }
-#else
+
     testNet2.ParamInstall(paramMem);
-#endif
     /*新网络测试输入参数是否有效*/
     for(int i=0;i<4;i++)
     {
         testNet2.run(Input[i]).show();
     }
     std::cout<<"================END==================="<<std::endl;
+    //#TODO check failed
+    tempTest();
     
     return true;
 }
-
-bool GradientCheckFun()
-{   
-    /*参数导入*/ 
-#if 0
+//#TODO check error
+bool tempTest()
+{
+    char* paramMem = NULL;
+    int fd = -1;
+/*构建输入样本*/
     double resultA[]={0};
     double inputA[]={0,0};
 
@@ -324,19 +313,61 @@ bool GradientCheckFun()
 
     double resultD[]={0};
     double inputD[]={1,1};
-#else
+
+    Array<double>Input[]={Array<double>(1,2,inputA,2),
+                          Array<double>(1,2,inputB,2),
+                          Array<double>(1,2,inputC,2),
+                          Array<double>(1,2,inputD,2)};
+
+    Array<double>Result[]={Array<double>(1,1,resultA,1),
+                           Array<double>(1,1,resultB,1),
+                           Array<double>(1,1,resultC,1),
+                           Array<double>(1,1,resultD,1)};
+    
+    FCLNet<double> testNet;
+    testNet.Addlayer(new NolinearUnit<double,2,3,4>(new SigmoidActivator<double>()));
+    testNet.Addlayer(new NolinearUnit<double,3,1,4>(new SigmoidActivator<double>()));
+
+    fd = open(PARAMFILE,O_RDONLY|O_EXCL,0600);
+    paramMem = (char*)malloc(OUTMEMLEN);
+    memset(paramMem,0,OUTMEMLEN);
+    //读取参数
+    int ret = 0;
+    if((ret=read(fd,paramMem,OUTMEMLEN))>0)
+    {
+        LOG_INFO("Read Param successfully!"<<ret);
+    }
+    else
+    {
+        LOG_INFO("Read Param failed! errno="<<errno);
+    }
+    close(fd);
+    testNet.ParamInstall(paramMem);
+    /*新网络测试输入参数是否有效*/
+    for(int i=0;i<4;i++)
+    {
+        testNet.run(Input[i]).show();
+    }
+    return true;
+}
+
+bool GradientCheckFun()
+{   
+    char* paramMem3 = NULL;
+    int fd = -1;
+    /*参数导入*/ 
     double resultA[]={0};
-    double inputA[]={1,1};
+    double inputA[]={0,0};
 
     double resultB[]={1};
-    double inputB[]={1,0};
+    double inputB[]={0,1};
 
     double resultC[]={1};
     double inputC[]={1,0};
 
     double resultD[]={0};
     double inputD[]={1,1};
-#endif
+    
     Array<double>Input[]={Array<double>(1,2,inputA,2),
                           Array<double>(1,2,inputB,2),
                           Array<double>(1,2,inputC,2),
@@ -349,22 +380,39 @@ bool GradientCheckFun()
     SquareLoss<double> lossFun;
     //构建新网络
     FCLNet<double> testNet2;
-    NolinearUnit<double,2,3,4>* layer1 = NULL;
-    NolinearUnit<double,3,1,4>* layer2 = NULL;
     //std::unique_ptr<NolinearUnit<double,2,3,4>> layer1(new NolinearUnit<double,2,3,4>(new SigmoidActivator<double>()));
     //std::unique_ptr<NolinearUnit<double,3,1,4>> layer2(new NolinearUnit<double,3,1,4>(new SigmoidActivator<double>()));
-    testNet2.Addlayer(layer1 = new NolinearUnit<double,2,3,4>(new SigmoidActivator<double>()));
-    testNet2.Addlayer(layer2 = new NolinearUnit<double,3,1,4>(new SigmoidActivator<double>()));
+    testNet2.Addlayer(new NolinearUnit<double,2,3,4>(new SigmoidActivator<double>()));
+    testNet2.Addlayer(new NolinearUnit<double,3,1,4>(new SigmoidActivator<double>()));
 
     /*随机梯度下降单样本输入做网络参数调整做梯度检查*/
+    //构建新网络
     /*w矩阵重构*/
     std::cout<<"============GRADIENT CHECK============"<<std::endl;
-#if 0
-    for(int j=0;j<testNet2.getLayerNum();j++)
-#else
-    for(int j=0;j<1;j++)
-#endif
+    paramMem3 = (char*)malloc(OUTMEMLEN);
+    fd = open(PARAMFILE,O_RDONLY|O_EXCL,0600);
+    memset(paramMem3,0,OUTMEMLEN);
+    //从文件加载参数
+    if(read(fd,paramMem3,OUTMEMLEN)>0)
     {
+        LOG_INFO("Read Param successfully!");
+    }
+    else
+    {
+        LOG_INFO("Read Param failed! errno="<<errno);
+    }
+    testNet2.ParamInstall(paramMem3);
+    //先跑一段，降一下下梯度
+#if 0
+    for(int j=0;j<TRAIN;j++)
+#endif
+        testNet2.train(Input,Result,lossFun,NUM);
+    //需要将整个网络的参数导出,首次保存原始参数
+    memset(paramMem3,0,OUTMEMLEN);
+    testNet2.ParamSave(paramMem3,OUTMEMLEN);
+    for(int j=0;j<testNet2.getLayerNum();j++)
+    {
+        std::cout<<"===============Layer "<<j<<"================="<<std::endl;
         //STEP1:保存当前weight值，并且进行一次反向计算 
         //只能改其中一支的值，因为按照微分计算出的倒数只是一个值
         //需要手动指定层的子类,获取子类独有成员
@@ -382,18 +430,24 @@ bool GradientCheckFun()
         paramMem1 = (char*)malloc(OUTMEMLEN);
         paramMem2 = (char*)malloc(OUTMEMLEN);
 
-        //需要将整个网络的参数导出
+        //需要将整个网络的参数导出,先恢复原始参数
+        testNet2.ParamInstall(paramMem3);
+
         testNet2.CheckSave(paramMem1,OUTMEMLEN,Δ,j);
         testNet2.CheckSave(paramMem2,OUTMEMLEN,-Δ,j);
-
-        testNet2.train(Input,Result,lossFun,NUM);
+        
+        LOG_INFO("===property Gradient======");
+        for(int k=0;k<1;k++)
+            testNet2.train(Input,Result,lossFun,NUM);
         //STEP2:使用w1和w2下同样本输入的loss值计算梯度
+        LOG_INFO("===increase Gradient======");
         testNet2.ParamInstall(paramMem1);
         for(int i=0;i<NUM;i++)
         {
             loss1 = loss1+lossFun.front(testNet2.run(Input[i]),Result[i]);
         }
 
+        LOG_INFO("===descrease Gradient======");
         testNet2.ParamInstall(paramMem2);
         for(int i=0;i<NUM;i++)
         {
@@ -405,9 +459,16 @@ bool GradientCheckFun()
         Array<double> ΔNet = (testNet2[j]->getΔweight(NUM));
 
         LOG_INFO("Δweight=>["<<ΔManual<<"]");
+        LOG_INFO("=======ΔNet============");
         ΔNet.show();
         //LOG_INFO("Δweight=>["<<ΔManual<<"]ΔNet=>["<<ΔNet<<"] diff=>["<<ΔManual-ΔNet<<"]");
+        if(NULL != paramMem1)
+            free(paramMem1);
+        if(NULL != paramMem2)
+            free(paramMem2);
     }
+    if(NULL != paramMem3)
+        free(paramMem3);
     std::cout<<"================END==================="<<std::endl;
     /*#TODO 借助python实现二维全局范围的数据可视化,后面做pythonAPI后直接在python实现*/
     std::cout<<"===============VISUAL================="<<std::endl;

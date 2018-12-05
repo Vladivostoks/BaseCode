@@ -249,7 +249,7 @@ class BaseUnit{
         virtual Array<T> getw() const =0;
         virtual Array<T> getbias() const =0;
         virtual Array<T> getΔweight(int num) const =0;
-        virtual Array<T> UnitFront(const Array<T>& input)=0;
+        virtual Array<T> UnitFront(const Array<T>& input,bool remind)=0;
         virtual bool UnitBack(Array<T>* Nextδ,Array<T>& NextWeight,unsigned int num=1)=0;
         //单元参数导入方法
         virtual bool ParamInstall(char *&mem)=0;
@@ -304,7 +304,7 @@ class NolinearUnit:public BaseUnit<T>{
         //梯度检查参数倒出
         unsigned int CheckSave(char *mem,unsigned int size,T step);
         //前向计算
-        Array<T> UnitFront(const Array<T>& input);
+        Array<T> UnitFront(const Array<T>& input,bool remind);
         //反响计算
         bool UnitBack(Array<T>* Nextδ,Array<T>& NextWeight,unsigned int num=1);
 };
@@ -350,26 +350,7 @@ NolinearUnit<T,m,n,IndexSum>::~NolinearUnit()
         delete Active;
     }
 }
-//导出最近n个样本的计算梯度
-template <class T,int m,int n,int IndexSum>
-Array<T> NolinearUnit<T,m,n,IndexSum>::getΔweight(int num) const
-{
-    //从最后一个开始,向前循环
-    Array<double> retA=weight;
-    retA.clear();
 
-    for(int i=Index-1,j=0;j<num;j++)
-    {
-        i=i<0?i+IndexSum:i;
-        //导出最近n个样本计算的w梯度
-        retA = retA+Array<T>::dot(InputValue[i].T(),δ[i]);
-        InputValue[i].T();
-        //循环
-        i--;
-    }
-
-    return retA;
-}
 //确认矩阵初始化的值
 template <class T,int m,int n,int IndexSum>
 bool NolinearUnit<T,m,n,IndexSum>::ParamInit(Array<T>& value)
@@ -415,7 +396,11 @@ bool NolinearUnit<T,m,n,IndexSum>::ParamInstall(char *&mem)
     //step2:导入
     weight = Array<T>::MemOut(dataMem);  
     bias = Array<T>::MemOut(dataMem);
-
+#if 0
+    LOG_INFO("======Check weight=========");
+    weight.show();
+    LOG_INFO("======Check End============");
+#endif
     mem += Head->memSize;
     return true;
 }
@@ -481,24 +466,36 @@ unsigned int NolinearUnit<T,m,n,IndexSum>::CheckSave(char *mem,unsigned int size
 {
     Array<double> tempWeight = weight;
     unsigned int ret = 0;
-    tempWeight[0][0] += step;
-    weight = tempWeight;
+
+    weight[0][0] += step;
     ret = ParamSave(mem,size);   
     //restore
     weight = tempWeight;
     return ret;
 }
-//单元前向计算
+//单元前向计算,开关是否记录输入值，默认关
 template <class T,int m,int n,int IndexSum>
-Array<T> NolinearUnit<T,m,n,IndexSum>::UnitFront(const Array<T>& input)
+Array<T> NolinearUnit<T,m,n,IndexSum>::UnitFront(const Array<T>& input,bool remind)
 {
-    //记录输入值
-    InputValue[Index] = input;
+    if(remind)
+    {
+        //记录输入值
+        InputValue[Index] = input;
+        //输入进行矩阵运算,并记录线形计算输出值
+        Out[Index] = Array<T>::dot(InputValue[Index],weight)+bias;
+        Array<T> rc = Active->front(Out[Index]); 
+        //更新当前缓存数组索引
+        Index = (Index+1)%IndexSum;
+        return rc; 
+    }
+
+    //不记录输入值，使用下一个索引的位置进行处理
+    int tempIndex = (Index+1)%IndexSum;
+    InputValue[tempIndex] = input;
     //输入进行矩阵运算,并记录线形计算输出值
-    Out[Index] = Array<T>::dot(InputValue[Index],weight)+bias;
-    Array<T> rc = Active->front(Out[Index]); 
-    //更新当前缓存数组索引
-    Index = (Index+1)%IndexSum;
+    Out[tempIndex] = Array<T>::dot(InputValue[tempIndex],weight)+bias;
+    Array<T> rc = Active->front(Out[tempIndex]); 
+    //不更新当前缓存数组索引
     return rc; 
 }
 
@@ -550,6 +547,26 @@ bool NolinearUnit<T,m,n,IndexSum>::UnitBack(Array<T>* Nextδ,Array<T>& NextWeigh
     return true;
 }
 
+//导出最近n个样本的计算梯度
+template <class T,int m,int n,int IndexSum>
+Array<T> NolinearUnit<T,m,n,IndexSum>::getΔweight(int num) const
+{
+    //从最后一个开始,向前循环
+    Array<double> retA=weight;
+    retA.clear();
+
+    for(int i=Index-1,j=0;j<num;j++)
+    {
+        i=i<0?i+IndexSum:i;
+        //导出最近n个样本计算的w梯度
+        retA = retA+Array<T>::dot(InputValue[i].T(),δ[i]);
+        InputValue[i].T();
+        //循环
+        i--;
+    }
+
+    return retA;
+}
 //Network Connected Module
 //数据传播网络抽象，主要成员是层组件向量
 
@@ -566,7 +583,7 @@ class FCLNet{
         //网络包含层数
         unsigned int getLayerNum();
         //前向传播
-        Array<M> run(Array<M>& indata);
+        Array<M> run(Array<M>& indata,bool remind=false);
         //反向传播,模版成员函数
         M train(Array<M>* X,Array<M>* Y,LossFun<M>& lossFun,const unsigned int num=1,bool enable=true);
         //快速索引
@@ -634,24 +651,25 @@ unsigned int FCLNet<M>::getLayerNum()
     return layerVector.size();
 }
 
-//输入数据，做网络计算,返回最后一个计算数组
+//输入数据，做网络计算,返回最后一个计算数组,设置开关控制是否记录当前输入，如果记录会改变Index值,
 template<class M>
-Array<M> FCLNet<M>::run(Array<M>& indata)
+Array<M> FCLNet<M>::run(Array<M>& indata,bool remind)
 {
     int i = 0;
     Array<M> tempdata = indata;
     for(i=0;i<layerVector.size();i++)
     {
-       tempdata = layerVector[i]->UnitFront(tempdata); 
+       tempdata = layerVector[i]->UnitFront(tempdata,remind); 
     }
     return tempdata;
 }
 
-//训练方法,输入训练数据和损失函数,支持一次多组数据
+//训练方法,输入训练数据和损失函数,支持一次多组数据,返回反向前的loss值
 template<class M>
 M FCLNet<M>::train(Array<M>* X,Array<M>* Y,LossFun<M>& lossFun,const unsigned int num,bool enable)
 {
     int i = 0;
+    std::unique_ptr<Array<M>[]> runValue(new Array<M>[num]);
     //step 1:获取输出个数
     BaseUnit<M>* outlayer = layerVector[layerVector.size()-1]; 
     int outSize = outlayer->getOutSize();
@@ -673,7 +691,8 @@ M FCLNet<M>::train(Array<M>* X,Array<M>* Y,LossFun<M>& lossFun,const unsigned in
     }
     for(i=0;i<num;i++)
     {
-        tempδ[i] = lossFun.back(run(X[i]),Y[i]);
+        runValue[i] = run(X[i],true);
+        tempδ[i] = lossFun.back(runValue[i],Y[i]);
     }
     //step 4:反向传播迭代 of course from back to begin
     for(i=layerVector.size()-1;i>=0;i--)
@@ -692,7 +711,7 @@ M FCLNet<M>::train(Array<M>* X,Array<M>* Y,LossFun<M>& lossFun,const unsigned in
         M ret = 0;
         for(i=0;i<num;i++)
         {
-            ret += lossFun.front(run(X[i]),Y[i]);
+            ret += lossFun.front((runValue[i]),Y[i]);
         }
         return ret;
     }
