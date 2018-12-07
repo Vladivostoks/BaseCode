@@ -39,6 +39,9 @@ Y υ [upsilon] 宇普西龙
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #include "Matrix.h"
 #include "sysTool.h"
@@ -360,7 +363,7 @@ bool NolinearUnit<T,m,n,IndexSum>::ParamInit(Array<T>& value)
     return true;
 }
 
-//参数导入
+//参数导入 调用MemOut后，之前数据地址会因为重定向而修改,以修正
 template <class T,int m,int n,int IndexSum>
 bool NolinearUnit<T,m,n,IndexSum>::ParamInstall(char *&mem)
 {
@@ -386,10 +389,10 @@ bool NolinearUnit<T,m,n,IndexSum>::ParamInstall(char *&mem)
 	MD5Init(&md5);         		
 	MD5Update(&md5,(unsigned char*)mem+16,Head->memSize-16);
 	MD5Final(&md5,Head->Digest);
-
+    
     if(0 != memcmp(HeadBk.Digest,Head->Digest,16))
     {
-        LOG_ERR("Param install failed!");
+        LOG_ERR("Check Digest failed!");
         memcpy(Head,&HeadBk,sizeof(typename  BaseUnit<T>::Param));
         return false;
     }
@@ -402,6 +405,9 @@ bool NolinearUnit<T,m,n,IndexSum>::ParamInstall(char *&mem)
     LOG_INFO("======Check End============");
 #endif
     mem += Head->memSize;
+
+    //还原头部
+    memcpy(Head,&HeadBk,sizeof(typename  BaseUnit<T>::Param));
     return true;
 }
 

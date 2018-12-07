@@ -291,9 +291,6 @@ bool FCLNetTestFunc()
         testNet2.run(Input[i]).show();
     }
     std::cout<<"================END==================="<<std::endl;
-    //#TODO check failed
-    tempTest();
-    
     return true;
 }
 //#TODO check error
@@ -353,7 +350,7 @@ bool tempTest()
 
 bool GradientCheckFun()
 {   
-    char* paramMem3 = NULL;
+    char* paramMem = NULL;
     int fd = -1;
     /*参数导入*/ 
     double resultA[]={0};
@@ -389,11 +386,12 @@ bool GradientCheckFun()
     //构建新网络
     /*w矩阵重构*/
     std::cout<<"============GRADIENT CHECK============"<<std::endl;
-    paramMem3 = (char*)malloc(OUTMEMLEN);
+    paramMem = (char*)malloc(OUTMEMLEN);
     fd = open(PARAMFILE,O_RDONLY|O_EXCL,0600);
-    memset(paramMem3,0,OUTMEMLEN);
+    memset(paramMem,0,OUTMEMLEN);
+    int ret =0;
     //从文件加载参数
-    if(read(fd,paramMem3,OUTMEMLEN)>0)
+    if((ret=read(fd,paramMem,OUTMEMLEN))>0)
     {
         LOG_INFO("Read Param successfully!");
     }
@@ -401,15 +399,15 @@ bool GradientCheckFun()
     {
         LOG_INFO("Read Param failed! errno="<<errno);
     }
-    testNet2.ParamInstall(paramMem3);
+    testNet2.ParamInstall(paramMem);
     //先跑一段，降一下下梯度
-#if 0
+#if 1
     for(int j=0;j<TRAIN;j++)
-#endif
         testNet2.train(Input,Result,lossFun,NUM);
-    //需要将整个网络的参数导出,首次保存原始参数
-    memset(paramMem3,0,OUTMEMLEN);
-    testNet2.ParamSave(paramMem3,OUTMEMLEN);
+    //需要将整个网络的参数导出,做梯度检查
+    memset(paramMem,0,OUTMEMLEN);
+    testNet2.ParamSave(paramMem,OUTMEMLEN);
+#endif
     for(int j=0;j<testNet2.getLayerNum();j++)
     {
         std::cout<<"===============Layer "<<j<<"================="<<std::endl;
@@ -418,6 +416,7 @@ bool GradientCheckFun()
         //需要手动指定层的子类,获取子类独有成员
         char* paramMem1 = NULL;
         char* paramMem2 = NULL;
+        char* paramMem3 = paramMem;
         double loss1=0;
         double loss2=0;
 #if 0
@@ -431,7 +430,10 @@ bool GradientCheckFun()
         paramMem2 = (char*)malloc(OUTMEMLEN);
 
         //需要将整个网络的参数导出,先恢复原始参数
-        testNet2.ParamInstall(paramMem3);
+        if(!testNet2.ParamInstall(paramMem3))
+        {
+            LOG_ERR("testNet2 P Install failed!");
+        }
 
         testNet2.CheckSave(paramMem1,OUTMEMLEN,Δ,j);
         testNet2.CheckSave(paramMem2,OUTMEMLEN,-Δ,j);
@@ -467,8 +469,8 @@ bool GradientCheckFun()
         if(NULL != paramMem2)
             free(paramMem2);
     }
-    if(NULL != paramMem3)
-        free(paramMem3);
+    if(NULL != paramMem)
+        free(paramMem);
     std::cout<<"================END==================="<<std::endl;
     /*#TODO 借助python实现二维全局范围的数据可视化,后面做pythonAPI后直接在python实现*/
     std::cout<<"===============VISUAL================="<<std::endl;

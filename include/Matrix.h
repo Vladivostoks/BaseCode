@@ -51,6 +51,8 @@ class Array{
                    //LOG_INFO(totalline<<"--"<<totalrow);
                 };
                 ~Vector(){};
+                template<class S>
+                bool Update(Array<S>& A);
                 bool reset()
                 {
                     dataAddr = NULL;
@@ -134,7 +136,7 @@ class Array{
                     return tempArray;
                 }
         };
-                
+        friend Vector;
     private:
         /*static line&row can not using straight*/
         unsigned int Line;
@@ -1148,6 +1150,22 @@ M Array<M>::squareSum()
     }
     return sum;
 }
+
+//冗余，更新Vector的值,用不到,A的Vector地址不对时候无法做实参数输入
+template<class M> 
+template<class S>
+bool Array<M>::Vector::Update(Array<S>& A)
+{
+    totalline=A.Line;
+    totalrow=A.Row;
+    flagT=A.flagT;
+    indexline=0;
+    indexrow=0;
+    Empty=0;
+    dataAddr=A.address;
+}
+
+
 //数组导出
 template<class M>
 Array<M> Array<M>::MemOut(char*& mem)
@@ -1158,10 +1176,20 @@ Array<M> Array<M>::MemOut(char*& mem)
         LOG_ERR("Array out failed! mem is NULL");
         return Null;
     }
+
     Array<M>* head=reinterpret_cast<Array<M>*>(mem);
+    //改变数据指向位置
+    head->address=reinterpret_cast<M*>(mem+sizeof(Array<M>));
+    //同时要更新寻址向量数据
+    head->Index.dataAddr = head->address;
     //自增
     mem+=head->spaceSize+sizeof(Array<M>);
-    return *head;
+    //生成ret
+    Array<M> retA = *head;
+    //还原mem的数据定向变量，避免修改后mem不能重复使用
+    head->address=0;
+    head->Index.dataAddr=0;
+    return retA;
 }
 //数组保存
 template<class M>
@@ -1174,8 +1202,17 @@ bool Array<M>::MemSave(char *&mem)
         memcpy(head,this,sizeof(Array<M>));
         //复制数据部分
         memcpy(mem+sizeof(Array<M>),address,spaceSize);
+        /*刻舟求剑*/
+#if 0
         //改变数据指向位置
         head->address=reinterpret_cast<M*>(mem+sizeof(Array<M>));
+        //同时要更新寻址向量数据
+        head->Index.dataAddr = head->address;
+#else
+        //加载的时候，需要重新定向数据段,这边直接写0
+        head->address = 0;
+        head->Index.dataAddr = 0;
+#endif
         //自增
         mem+=spaceSize+sizeof(Array<M>);
         return true;
